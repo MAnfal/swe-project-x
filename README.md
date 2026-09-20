@@ -17,6 +17,7 @@ do not render on GitHub, so read them there rather than here.
 | | |
 | --- | --- |
 | **Prototype** | https://swe-project-x.vercel.app |
+| **Video walkthrough** | [Loom, ~5 min](https://www.loom.com/share/13273d9f4c384711bb2fd908b4c74a73) — the problem, the prototype driven end to end, and how it was built |
 | **Design rationale** | [Google Doc](https://docs.google.com/document/d/1B6-XtsuPth4XSiOevKFVXq4RyE39KCGvYjSAGURytJ4/edit?usp=sharing) — why this theme, what makes it non-obvious, the tradeoffs, and what's next |
 | **Spec-driven development** | [The method this was built with](https://anfalmushtaq.com/articles/primitives-of-spec-driven-development) |
 | **Mid-fi design** | [Claude artifact](https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1) — what the canvas was built against |
