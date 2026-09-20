@@ -43,7 +43,7 @@ Then it is a contained change to `src/components/canvas/time-slider.tsx` plus it
 
 ## Related
 
-- `plans/2026-09-20-project-grain-prototype/04-canvas-topology/plan.md` § Design Input
-- `plans/2026-09-20-project-grain-prototype/design/README.md`, page 10
+- `plans/completed/2026-09-20-project-grain-prototype/04-canvas-topology/plan.md` § Design Input
+- `plans/completed/2026-09-20-project-grain-prototype/design/README.md`, page 10
 - Chunk 04 shipped Home/End jump-to-bounds, which covers the "get to the edges fast" need that
   overlaps this gesture's most likely use.

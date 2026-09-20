@@ -70,6 +70,6 @@ to the file that needs it.
 ## Related
 
 - `.claude/resources/bibles/swe/testing.md`
-- `plans/2026-09-20-project-grain-prototype/ORCHESTRATOR.md` § Design Decisions, item 6
+- `plans/completed/2026-09-20-project-grain-prototype/ORCHESTRATOR.md` § Design Decisions, item 6
 - `src/lib/ai/enrichment-record.test.ts` — the pattern to copy
 - `src/lib/view/fixture.ts` — the helpers that make it a small change

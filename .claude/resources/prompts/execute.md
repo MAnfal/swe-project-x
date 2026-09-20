@@ -62,6 +62,16 @@ Mechanics that shape how this loop runs:
 - **The dispatch brief is the whole context.** The subagent cannot see this conversation.
   Anything it needs — paths, decisions, carry-forward learnings from earlier chunks —
   goes in the prompt or in a file the prompt names.
+- **The session scratchpad is shared by every agent in the session, including you.** It is
+  one flat directory, so two agents that both choose the obvious filename overwrite each
+  other silently — and the second agent then reports a result produced by the first
+  agent's file. Require each agent, in the dispatch brief, to work in
+  `<scratchpad>/<agent-name>/`, a directory it creates and owns, and do the same with your
+  own scratch files and backups. This matters most for anything whose output becomes
+  evidence: a borrowed script that *fails* gets noticed, and a borrowed script that
+  *passes* gets recorded under a chunk it never tested. Gate scripts avoid the problem
+  entirely by living in the worktree and being committed — see `templates/chunk.md`
+  § Verification Gates.
 
 ## Execution modes
 
@@ -188,14 +198,22 @@ Update the State table and append an Execution Log row in `ORCHESTRATOR.md`. Wav
 boundaries (`waveN_merged`, `waveN+1_dispatched`) are mandatory log entries — the retro
 derives its wave metrics from them.
 
-Once the PR is **merged**, remove the worktree:
+Once the PR is **merged**, remove the worktree and assert it is gone:
 
 ```bash
 git worktree remove ".worktrees/<chunk-name>" && git worktree prune
+git worktree list          # must show the main checkout only
 ```
 
 Not before the merge — the branch still needs to exist. A worktree that refuses to be
 removed is holding uncommitted work; look at it rather than forcing it.
+
+**This is a step with a check, not a tidiness note.** A lint or test command that takes no
+path argument walks the whole project directory, including a surviving worktree *and its
+`node_modules`* — so the next gate run on the plan branch reports thousands of problems
+that belong to nobody, or passes for reasons that have nothing to do with the tree you
+think you measured. The `git worktree list` line above is what makes the removal
+observable; without it the thing that removes the worktree is a human remembering.
 
 Then wait for the user to say to proceed. Do not start the next chunk on your own.
 
@@ -225,11 +243,23 @@ If the checkpoint doesn't hold — the story needs something a later chunk was g
    wave ("no X uses Y", "there are N of these") was true when written and may not be now.
    Re-check it against the current tree before handing it to an implementer.
 3b. **Re-verify `project.md` against the merged tree.** Each chunk should have updated it
-   as it landed; this is the check that it did. Confirm the Commands table still runs, the
-   Convention Map's globs still match where those files actually live, and the Stack's
-   versions still match what is installed. Whatever this catches is also a journal entry —
-   a chunk that changed an architecture fact without recording it is a process gap, not a
-   one-off, and the next wave inherits the stale file.
+   as it landed; this is the check that it did. Confirm the Convention Map's globs still
+   match where those files actually live, and that the Stack's versions still match what
+   is installed. Whatever this catches is also a journal entry — a chunk that changed an
+   architecture fact without recording it is a process gap, not a one-off, and the next
+   wave inherits the stale file. Two ways this check is done wrong:
+
+   - **Re-derive the Commands table from `package.json`; don't re-run what it already
+     lists.** Running the listed commands only finds commands that *changed*. It
+     structurally cannot find one that was never written down — and the commands most
+     likely to be missing are the ones the **lead** uses (running the production build for
+     a story checkpoint, a codegen script), because the deltas protocol only ever asks
+     implementers what they changed.
+   - **Re-read the sections this wave edited as a whole, not just the new facts.**
+     Presence of the new line is not correctness of the section around it. An insertion
+     into a nested block can reparent the paragraph below it, so a generic rule ends up
+     reading as a description of one specific subdirectory — true content, wrong scope,
+     and every later implementer reads it wrong.
 4. **Sweep stale worktrees.** `git worktree list` — anything left for a chunk that already
    merged means the cleanup above didn't run. Remove it now, before the next wave adds more.
 5. **Absorb open warnings.** If a non-blocking finding from the last wave naturally
@@ -300,9 +330,26 @@ to a later chunk, ship it now. The rubric is the reviewer's contract; the plan's
 chunk-to-artifact mapping is a suggestion. A rubric requirement arriving one chunk late
 costs a full rework cycle.
 
-**Amendments travel in pairs.** No plan amendment is complete until the matching rubric
-item is amended in the same commit. The reviewer grades against the rubric — a rubric that
-still describes the old behavior fails correct work.
+**An amendment is a sweep, not a pair.** A plan amendment is complete when **every**
+section that encodes the old decision has changed — Context, Acceptance Criteria, What To
+Do, Tasks, Reuse Audit, Deliverables, Verification Gates, and the rubric — all in the same
+commit. The reviewer grades against the rubric and the criteria; a chunk whose prose says
+one thing and whose criteria, tasks and gates say another fails whatever it builds,
+because two of its rubric items cannot both pass.
+
+Before committing the amendment, grep the chunk for the old term and account for every
+hit:
+
+```bash
+grep -in '<old term>' <chunk>/plan.md <chunk>/rubric.md
+```
+
+The prose is the easiest part to fix and the least load-bearing. **Verification gates are
+the part that hurts most**, because a gate encodes a decision as a *filename pattern* —
+the least reviewable place a design decision can hide. A gate resolving its target with
+`grep -iE 'old-noun.*\.tsx$'` exits 1 against an implementer who correctly built the
+renamed file, and a gate globbing a directory the project doesn't use matches zero files
+and exits 0. Neither is visible from reading the amended prose.
 
 **You originate claims too.** `.claude/resources/prompts/evidence.md` binds you as much as
 the implementer. Before putting a factual claim into a dispatch brief, a review demand, or a

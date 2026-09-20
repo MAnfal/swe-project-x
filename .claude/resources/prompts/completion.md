@@ -16,6 +16,25 @@ references:
 
 Two halves, in this order: ship the work, then close the loop.
 
+## Step 0 — Reconcile the State table before reading it
+
+The first action is **not** to read the ORCHESTRATOR's State table. It is to check what
+GitHub says, and correct the table where the two disagree:
+
+```bash
+gh pr list --state all --json number,title,state,mergedAt,baseRefName
+git fetch --prune origin && git status -sb
+```
+
+Then branch on the reconciled state, not the written one.
+
+The State table is hand-written, and it drifts at exactly one transition: `pr_merged`.
+Every other row is written by an agent who was just told to do the thing; a merge is
+performed by the user, in a browser, and recorded by whoever remembers. A stale `PR open`
+row halts delivery on a plan that is finished, and a stale `Merged` row starts delivery on
+one that isn't — and if the local plan branch is behind its own remote, nothing on disk
+contradicts either. Fix the table and log the correction before proceeding.
+
 ## Part 1 — Ship
 
 ### Pre-delivery gates

@@ -56,6 +56,20 @@ Search prose with a multiline mode, or with a fragment short enough to fit insid
 wrapped line. When a zero hit is surprising, retry with a shorter phrase before concluding
 the content is absent.
 
+## A red run from tests-first ordering is necessary, not sufficient
+
+Writing the tests first guarantees they fail, because the module does not exist yet. That
+proves **absence**, and absence is free. It says nothing about whether any assertion
+discriminates a right implementation from a wrong one — a test written against a fixture
+that lacks the edge case is red before, green after, and stays green forever once the
+guarantee it was meant to protect is deleted.
+
+`0 tests collected` is an import error wearing a red run's clothes. Read the red output
+before citing it: a suite that failed to *load* and an assertion that failed against a
+*wrong value* look identical in an exit status and nothing alike in the log. For any
+guarantee worth calling a contract, the cheap proof is one deliberate mutation — break the
+line that implements it and confirm something goes red.
+
 ## Verify inherited and relayed claims
 
 A claim you repeat ships under your name. Four patterns account for most of them:

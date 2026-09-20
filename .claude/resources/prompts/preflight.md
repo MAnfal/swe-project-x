@@ -63,6 +63,22 @@ package, or path that doesn't exist fails at the worst possible moment. Confirm 
 commands in `.claude/resources/project.md` still match reality — they drift as the project
 grows.
 
+## 4.5 The wave's rubrics are current
+
+Preflight checks the plan; nobody checks the **rubric**, and the rubric is what the
+reviewer actually grades against. For every chunk in the wave about to be dispatched:
+
+- If `.claude/resources/project.md`'s Convention Map is non-empty, the rubric must cite it
+  at all. A rubric written before the map was populated carries what the plan knew rather
+  than what the project declares, and every review it drives is graded against a map the
+  project no longer has an excuse for missing.
+- Re-run `generate-chunk-rubric` on any chunk whose rubric predates the most recent
+  `project.md` change, and keep whatever it adds.
+
+A plan-level standing instruction to regenerate rubrics is not enough on its own — phrased
+once, it gets discharged against whichever chunk is in front of you and the rest keep the
+stale file. This is a per-wave check because the wave is the unit that gets dispatched.
+
 ## 5. Documentation impact
 
 If the chunk adds, moves, renames, or deletes anything, the docs that describe it change in
@@ -91,5 +107,14 @@ Strip any hits from code samples before dispatch. The plan's organization never 
 
 ## On failure
 
-Halt. Report exactly which references failed. Fix the plan — or the tree — before spawning
-anyone. Log a `preflight_failed` row in the ORCHESTRATOR with what was missing.
+Halt. Report exactly which references failed. Fix the plan — or the tree — **and commit
+the fix** — before spawning anyone. An uncommitted fix does not reach the worktree: see
+`prompts/worktree.md` § "Creating one". Log a `preflight_failed` row in the ORCHESTRATOR
+with what was missing.
+
+**A defect in a gate block is in every copy of that block.** Gate blocks are written from
+one template and copied across chunks, so a defect found in the chunk in front of you is
+almost certainly in every chunk that hasn't started yet. Grep the remaining chunk plans
+for the same line, fix them all in the **same commit**, and say in the `preflight_failed`
+row that you did. Fixing only the dispatching chunk guarantees the next wave rediscovers
+it — which is the expensive half of the same bug, found later.

@@ -62,5 +62,5 @@ None of these is chosen; they are what the next planning session should weigh.
 
 ## Where the evidence is
 
-`plans/2026-09-20-project-grain-prototype/retro.md`, § "Delivery boundary — Part 1", under
+`plans/completed/2026-09-20-project-grain-prototype/retro.md`, § "Delivery boundary — Part 1", under
 "Two things worth seeing that no chunk review could have".

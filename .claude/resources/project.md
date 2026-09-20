@@ -388,6 +388,17 @@ a follow-up.
       command shown, never by reformatting the data in another language — chunk 06 also
       presented Python `json.dumps` output as node's `JSON.stringify`, which spaces its
       separators differently.
+- **A corpus-wide `grep` in this repository is unreadable unless it is scoped to code
+  extensions.** Roughly half the tracked bytes are captured API output, and committed
+  snapshots contain other projects' changelogs — so a bare `grep -rn 'process\.env' src/`
+  buries the answer under matches from *inside a fixture*. Always pass
+  `--include='*.ts' --include='*.tsx'`. Measured 2026-09-20 at the US1 checkpoint: the
+  scoped grep returns exactly one line (a comment in `github.ts`); the unscoped one
+  returns a screenful. Scope first, then read.
+- **`git ls-files 'src/app/**/page.tsx'` returns 0 and the file exists.** Git's `**/`
+  requires an intervening directory, so the glob misses `src/app/page.tsx` at the root.
+  Before concluding a Convention Map row matches nothing, confirm with a plain
+  `git ls-files src/app`. Measured 2026-09-20 at the wave-4 boundary.
 - **`setState` inside `useEffect` is a lint *error*, not a warning.** `eslint-config-next`
   16.3.5 enables `react-hooks/set-state-in-effect` at error level, so a "read
   `localStorage` after mount and set state" component fails `pnpm lint` outright. Measured

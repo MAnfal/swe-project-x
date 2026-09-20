@@ -116,6 +116,26 @@ asserts a file exists, a symbol is unused, or a library behaves a certain way ha
 assertion to an implementer who has no reason to doubt it. Open the source. A capped or
 scoped search proves presence, never absence.
 
+**A number you hand an implementer needs a caveat proportionate to how wrong it can be.**
+"Lower bound, not exact" is honest for a 10% sampling error and useless for an order of
+magnitude — an implementer can reasonably act on a figure that is 16× low before anyone
+notices the method was wrong. If your method can be off by an order of magnitude, either
+measure properly or hand over the **query** rather than the result and let the implementer
+run it.
+
+**Name the path, not the kind, when one chunk consumes another's output.** Write "reads
+`src/lib/ingest/fixtures/<name>.transcript.json`", never "reads the fixture chunk 02
+commits". Two chunks using one word for two different artifacts is invisible at planning
+time and costs the consuming chunk its first full cycle: its very first task reads a file
+that was never produced. A path is checkable by preflight; a kind is not.
+
+**Every externally-priced or externally-bounded constant carries its reason.** A model id,
+a timeout, a page size, a retry count, a concurrency bound, a rate ceiling — put a one-line
+rationale beside the number, or a pointer to the Design Decision that holds it. The cost of
+the missing sentence is not the wrong value; it is that nobody can tell a considered value
+from a default, so nobody re-examines it. A default written down next to a *correct*
+adjacent fact reads as more considered, not less.
+
 ## Phase 3 — Write the gates
 
 Each chunk gets executable verification gates. Read `.claude/resources/prompts/gates.md`
@@ -126,12 +146,18 @@ implementer's work and reports coverage it does not provide.
 If you cannot run the gate yourself while planning, write the instruction as a question
 rather than an assertion:
 
-> "Run this gate against the base commit. Record the exact command, its exit status, and
-> the observed failure evidence. If it exits 0 on base, the gate proves nothing — revise
-> it and record the revision."
+> "Run this gate against the base commit **and** against the finished tree. Record the
+> exact command, both exit statuses, and the observed failure evidence. If it exits 0 on
+> base, the gate proves nothing. If it fails on both with the **same error text**, the
+> command is broken rather than the tree — the gate is vacuous in the direction an exit
+> code cannot show. Revise it either way and record the revision."
 
 An assertion ("this gate MUST fail on base") written from a mental model is wrong exactly
 when it matters. The question form cannot be wrong and returns the same evidence.
+
+The base-tree check is the one a planner most often gets half right: a command the tool
+rejects before it reaches the project fails on base, fails after, and satisfies "must fail
+on base" completely. Asking for the *error text* on both trees is what separates the two.
 
 ## Phase 2.4 — Cite the standards each chunk has to meet
 

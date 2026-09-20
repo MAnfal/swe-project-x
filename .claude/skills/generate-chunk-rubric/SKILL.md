@@ -79,6 +79,19 @@ gains testable behavior — not one per layer, and not a generic "has tests".
 If the chunk adds no testable behavior, write `N/A — <which of types / declarative config /
 docs this chunk is>`. An explicit N/A is a grade; a blank is an omission.
 
+**Always emit the constructed-input item** for any chunk with testable behavior, verbatim:
+
+```
+- [ ] For each defensive branch in this chunk — a guard, a boundary, a clamp, a
+      uniqueness or normalization check — a test exists whose input cannot come from the
+      committed fixture. Delete the branch and confirm a named test goes red
+```
+
+This one is standing rather than derived. A test drawn from real captured output only ever
+contains the cases its source produced, so the guard for the case it didn't produce is
+pinned by nothing and deletes green while the suite stays whole. It is the single most
+common surviving mutant, and it is invisible to every other item in the rubric.
+
 ## Step 4 — Check for plan/rubric contradictions
 
 Before writing, compare the rubric items you are about to emit against the chunk plan's

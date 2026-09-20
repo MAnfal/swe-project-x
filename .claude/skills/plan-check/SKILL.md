@@ -110,6 +110,26 @@ For each chunk's verification gates, flag:
   capable of failing.
 - **MEDIUM — a gate over immutable history** (a grep across an append-only directory
   asserting something about current state).
+- **HIGH — a gate whose glob matches zero files on the current tree.** Resolve every path
+  pattern in a gate against `git ls-files` and report the count. A gate whose file list is
+  empty still exits 0 and reads as a pass; this is the most common way a gate in a plan
+  proves nothing.
+
+## Step 5b — Unjustified constants
+
+Flag any externally-priced or externally-bounded constant that appears in a chunk plan
+with no reason beside it and no Design Decision referencing it:
+
+- **HIGH — a model id** (`claude-*`, `gpt-*`, any provider model string) with no Design
+  Decision covering the choice. A model id sitting beside a *correct* adjacent fact — a
+  pricing note, a context-window figure — reads as a considered choice and is the hardest
+  default to spot.
+- **MEDIUM — a timeout, page size, retry count, concurrency bound or rate ceiling** with
+  no one-line rationale and no Design Decision pointer.
+
+The defect is not the value; it is that nobody can distinguish a considered value from a
+default, so nobody re-examines it. Report the constant, every location it appears, and
+that no Design Decision references it — not a suggested replacement value.
 
 ## Report
 

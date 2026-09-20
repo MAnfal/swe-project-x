@@ -1057,44 +1057,274 @@ iteration; every line here skips one.
 
 ## Part 2: Retrospective Summary
 
+Filled 2026-09-20 by `plan-retro`, after PR [#8](https://github.com/MAnfal/swe-project-x/pull/8)
+merged at `f49f060`. `plans/completed/` was empty when this ran, so **nothing here can be a
+Rule** — every cross-plan pattern below is a Heuristic awaiting a second occurrence.
+
 ### Plan Stats
 
 | Field | Value |
 | ----- | ----- |
-| Plan | |
-| Completed | |
-| Chunks | |
-| Waves | |
-| Total review iterations | |
+| Plan | Project Grain — Codeowner Visibility Prototype |
+| Completed | 2026-09-20 (planned and executed same day) |
+| Chunks | 6 planned, 6 merged, 0 dismissed |
+| Waves | 5 — one of them parallel (wave 3) |
+| Total review iterations | 12 across 6 chunks (mean 2.0) |
+| Chunk PRs | #1, #2, #3, #4, #6, #7 — all → the plan branch |
+| Delivery PRs | #5 (chunks 01–04, opened early at the user's request so Vercel could be set up against `main`), #8 (chunks 05–06) |
+| Preflight halts | 4 of 5 waves (`02`, `03/04`, `05`, `06`) — wave 1 was the only clean one |
+| Rubrics regenerated mid-plan | 3 (02 at wave 2, 03 + 04 at wave 3, 05 and 06 at their own waves) |
+| Stories | Foundation ☑, US1 ☑, US2 ☑ — all three checkpoints demoed by the lead in a browser |
+| Ideas filed rather than absorbed | 4 (`plans/ideas/`) |
 
 ### Per-Chunk Execution
 
 | Chunk | Review iterations | Failure categories | Mode | Conflicts? |
 | ----- | ----------------- | ------------------ | ---- | ---------- |
+| 01 Boilerplate | 1 (PASS) | — | sequential, wave 1 | no |
+| 02 Ingest core | 2 | `missing-tests` | sequential, wave 2 | no |
+| 03 AI enrichment | 2 | `missing-tests` | **parallel**, wave 3 | no |
+| 04 Canvas topology | 3 | `missing-tests` | **parallel**, wave 3 | yes — semantic, see below |
+| 05 Canvas levels | 2 | `missing-tests` | sequential, wave 4 | no |
+| 06 Live ingest | 2 | `other` (report fidelity) | sequential, wave 5 | no |
 
-Failure categories: `missing-tests`, `convention-violation`, `type-errors`,
-`out-of-scope`, `acceptance-criteria`, `lint`, `other`.
+PR size, for calibration against iteration count — the two are not correlated:
+
+| Chunk | PR | Commits | Files | +/− |
+| ----- | -- | ------- | ----- | --- |
+| 01 | #1 | 2 | 32 | +8583 / −37 |
+| 02 | #2 | 7 | 21 | +18590 / −22 |
+| 03 | #3 | 5 | 19 | +34805 / −39 |
+| 04 | #4 | 8 | 24 | +4904 / −75 |
+| 05 | #6 | 4 | 19 | +3042 / −120 |
+| 06 | #7 | 9 | 25 | +4013 / −69 |
+
+(Insertion counts are dominated by committed snapshots and HTTP transcripts, not code.)
+
+**Chunk 04's conflict was not a file conflict.** Merging the plan branch into chunk 04
+turned three tests red. One was its own generated snapshot index, working as designed. The
+other two were chunk 03's `src/lib/ai/baked-snapshots.test.ts`, which `readdirSync`s
+`src/lib/snapshots/` and asserts *every* file there carries enrichment — while chunk 04's
+snapshot deliberately carries none. Neither chunk was wrong; the contradiction existed only
+in the union. Fixed by strengthening the invariant rather than whitelisting: absent
+`enrichment` means un-enriched fixture and only its shape is asserted; **present** means it
+must be complete, because partial enrichment is the actual bug.
 
 ### Prediction Accuracy
 
-- Predicted parallel, actually safe:
-- Predicted parallel, had conflicts:
-- Predicted sequential, could have been parallel:
+- **Predicted parallel, actually safe (at file level):** wave 3 (chunks 03 + 04). The
+  ORCHESTRATOR's claim — *"they share no file"* — held even after the lead deliberately
+  put both chunks' snapshots in one directory, because window-qualified filenames and an
+  explicit per-chunk path instruction did their job. Zero merge conflicts, zero file
+  collisions.
+- **Predicted parallel, had conflicts (at predicate level):** the same wave. The plan
+  reasoned about *files* colliding and prevented that; what it did not reason about was a
+  **predicate** colliding. `readdirSync` + `it.each` is the obvious way to write "every
+  committed snapshot is well-formed", and it is only wrong because the directory came to
+  hold two kinds of thing that look alike. Cost: one brief `chunk_blocked`, resolved the
+  same wave.
+- **Predicted sequential, could have been parallel:** none. 02 → 03/04, 04 → 05, and
+  02+03+04+05 → 06 are all real data dependencies, and the wave-boundary re-verifications
+  confirm each later chunk consumed the earlier one's actual output.
+- **A dependency that was real but misdescribed:** chunk 04's plan said it renders "the
+  fixture snapshot committed by chunk 02". Chunk 02 committed an HTTP *transcript*, a
+  different artifact. Preflight caught it before dispatch and chunk 02's `--replay` mode
+  covered the gap, so chunk 04 generated its own snapshot offline. The parallelism call was
+  correct; the artifact name in the plan was not.
+- **Five of six waves were single-chunk**, so this plan's parallelism was largely notional
+  — and the one parallel wave is also the only one that produced a cross-chunk defect.
 
 ### Distilled Patterns
 
-Tag each by confidence. Cross-reference the retros already in `plans/completed/`.
-
 #### Rules (seen across 2+ plans)
+
+None. `plans/completed/` was empty when this retro ran; this is the first plan through the
+loop. The Heuristics below are the candidates — each one that recurs in the next plan's
+retro graduates.
 
 #### Heuristics (seen once, likely to generalize)
 
+1. **"Tests first, seen failing" is satisfied in full by a suite that cannot compile.**
+   Four of the six chunks (02, 03, 04, 05) failed their first review for exactly one
+   reason: a guarantee no test discriminates. Every one of them *had* written tests first
+   and *had* observed them red — and every red run was `0 tests collected`, an import
+   error, which proves the module was absent and nothing about whether an assertion is
+   load-bearing. The check passes most loudly at the moment it is least informative.
+
+2. **The unpinned logic is always a guard for an input the committed fixture does not
+   contain.** Every surviving mutant in this plan was this shape: a pull request outside
+   the declared window, a merge exactly on a bucket boundary, two commits sharing a SHA
+   prefix, an uppercase SHA. Principle 4 pushes hard toward real captured output, which is
+   right — and the cost is that a real fixture contains only the cases that repository
+   happened to produce. The guard for the case it *didn't* produce has nothing holding it.
+
+3. **A carry-forward in the dispatch brief kills the failure mode it names.** Chunk 06 is
+   the only logic-bearing chunk that did not fail iteration 1 on an unpinned guard. Its
+   brief carried the carry-forward explicitly, the implementer mutation-tested before
+   review, and iteration 1's reviewer went hunting for that failure mode and could not find
+   it. This is the strongest evidence in the plan that the execution journal pays for
+   itself within the same plan, not just the next one.
+
+4. **A defect found in a copied block is present in every copy.** Wave 2's preflight found
+   two fatal gate defects and they were fixed **in chunk 02 only**. Chunks 03–06 were
+   written from the same template and carried the same two lines until wave 3's preflight
+   found them again. When preflight finds a gate defect, the block was almost certainly
+   copied.
+
+5. **A fresh reviewer told to find *different* wrong implementations widens coverage; one
+   told to re-check the named ones narrows it.** Chunk 02's iteration 2 found eight further
+   wrong implementations plus two gaps the named mutants never touched; chunk 04's
+   iteration 2 found three new survivors in the same two functions; chunk 05's iteration 2
+   mutated three functions neither earlier pass had touched. The narrower and more
+   actionable the prior feedback, the more the re-check has to widen to stay honest — the
+   fix was written by someone who knew exactly which mutants would be re-run.
+
+6. **A gate encodes a design decision as a filename pattern, which is the least reviewable
+   place one can hide.** Twice: chunk 04's gate globbing `app/**/*.tsx` and `lib/**/*.ts`
+   in a project that roots both under `src/` (matching zero files, exiting 0, reading as a
+   pass), and chunk 05's gate resolving its target with `grep -iE 'change.*node.*\.tsx$'`
+   after the design amendment had renamed the thing to `change-card.tsx`. Both survived a
+   plan amendment that updated the prose.
+
+7. **Preflight only catches plan-vs-tree drift because it checks the base branch rather
+   than the working tree.** Chunk 04 was planned against an artifact chunk 02 never
+   produced. Nothing else in the loop would have found it before the implementer's first
+   task read a file that isn't there.
+
+8. **A caveat has to be proportionate to how wrong the number can be.** The lead handed
+   chunk 03 a merged-PR density table that was 16× low on one row (shadcn-ui: 13 vs 212),
+   labelled "lower bounds, not exact counts". True, and not enough — an implementer could
+   reasonably have dropped a curated repository as too quiet. "Lower bound" is fine for a
+   10% sampling error and useless for an order of magnitude. Hand over the *query*, not the
+   result.
+
+9. **The parts built to be falsified survive; the prose around them drifts.** Chunk 06's
+   gates and mutation table came through every independent re-run intact. Both its blocking
+   findings were in the narrative: hand-transcribed transcripts showing fields the code
+   cannot emit, then — inside the fix — the same body pasted twice under prose claiming the
+   two differed. Evidence discipline has to reach the report, and nothing in the loop gates
+   the report.
+
+10. **A state machine whose state is hand-written drifts at the one transition nobody is
+    dispatched to perform.** `/plan:complete` opened on a State table reading chunk 06
+    `PR open`; PR #7 had merged 20 minutes earlier. Every other row is written by an agent
+    who was just told to do the thing; `pr_merged` is written by whoever remembers.
+
 #### Observations (notable, needs more data)
+
+- **No iteration-1 review in this plan found a behavioural defect.** The code was correct
+  every time. What the review loop bought, six times out of six, was *evidence* — and in
+  each case a mutation the lead then reproduced independently in under a minute. That is
+  not an argument for skipping review: chunk 04's `volumeSeries` clamp is the difference
+  between a merge exactly at `to` landing in the last bucket and writing off the end of the
+  array, and it would have shipped invisible.
+- **Iteration count tracks logic surface, not diff size.** Chunk 01 (32 files, +8583)
+  passed on iteration 1; chunk 04 (24 files, +4904) took three.
+- **Preflight halted 4 waves out of 5.** Either the planning phase systematically
+  under-verifies gate blocks and cross-chunk artifact names, or preflight is doing exactly
+  the job it was designed for and this is the steady state. One plan cannot distinguish
+  these; worth counting again next time.
+- **The shared session scratchpad is a correctness hazard, not just untidy.** Chunk 03's
+  `gate2.sh` overwrote chunk 04's at the same path, and chunk 04 reported a gate failure it
+  had never written. It was caught only because the borrowed gate *failed* with unfamiliar
+  wording; a borrowed gate that **passed** would have been recorded as evidence under a
+  chunk it never tested. The lead's own `.bak` restore loops wrote into the same flat
+  directory.
+- **Story checkpoints were worth their cost.** US1 was demoable at chunk 05, which is what
+  made shipping chunks 01–04 early as PR #5 a safe call rather than a half-built layer.
 
 ### Framework Updates Proposed
 
-Evidence must cite the chunk and what happened — "Chunk 03: reviewer flagged the same
-missing import 3 iterations running", not "reviewers struggle with imports".
+Evidence cites the chunk and what happened. **All 21 were approved and applied on
+2026-09-20**, in the close-out commit — see `Approved?`. Each target file was re-read
+before editing, so the quoted line numbers describe the file as it was *before* the fix.
 
-| Target file | Proposed change | Evidence | Approved? |
-| ----------- | --------------- | -------- | --------- |
+| # | Target file | Proposed change | Evidence | Approved? |
+| - | ----------- | --------------- | -------- | --------- |
+| 1 | `templates/rubric.md` | Amend the universal check (line 28) to: tests were observed failing **for the right reason** — the report distinguishes a suite that failed to *import* from an assertion that failed against a *wrong value*; for any guarantee the plan calls a contract, the report shows that assertion failing against a **plausible wrong implementation**. | Chunks 02, 03, 04, 05 each failed iteration 1 on tests that pass against any implementation. All four red runs were `0 tests collected`. Current wording is satisfied in full by a suite that cannot compile. |**Applied 2026-09-20** |
+| 2 | `prompts/evidence.md` | Add: *"A red run from tests-first ordering is necessary, not sufficient. `0 tests collected` is an import error wearing a red run's clothes."* | Same as #1. |**Applied 2026-09-20** |
+| 3 | `templates/chunk.md` § Test Plan + `skills/generate-chunk-rubric` | Require, per guard or boundary in the implementation, a named test whose input is **constructed** rather than drawn from the fixture. Rubric generator emits a standing item: *"For each defensive branch, a test exists whose input cannot come from the committed fixture."* | Every surviving mutant across chunks 02–05 was a guard for an input the committed fixture does not contain (out-of-window PR, bucket-boundary merge, shared SHA prefix, uppercase SHA). Four chunks out of four is a hole in what we ask for, not four implementer failures. |**Applied 2026-09-20** |
+| 4 | `prompts/gates.md` § "Prove the gate can fail on the base tree" (line 64) | Add a third watched shape beside the two at lines 87–94: **a failure that is not about the chunk**. Compare the gate's *error text* on base and on the finished tree, not the exit status. Identical output both times means the command is broken, not the tree. | Chunk 01: `pnpm test --run` exits non-zero on base *and* after, with the identical `ERROR Unknown option: 'run'` — pnpm's parser rejects it before Vitest starts. It satisfied every existing check for gate quality while proving nothing. Reviewer reproduced it in a directory with no `package.json` at all. |**Applied 2026-09-20** |
+| 5 | `prompts/planning.md:126-133` | Mirror one sentence of #4 into the planner's fallback for gates it cannot run at planning time — it asks "if it exits 0 on base it proves nothing" and never asks the converse. | Same as #4. `prompts/preflight.md` §4 would normally catch this by dry-running, but for a bootstrap chunk there is no project to dry-run against — the one check positioned to catch it is structurally unavailable for exactly the chunk that most needs it. |**Applied 2026-09-20** |
+| 6 | `prompts/review.md` (verification section) | Add: *"If you build an instrument during the review — a mutation harness, a script, a diff filter — validate it before trusting it. Run it once against an unmutated tree and confirm it reports clean, and once against a mutation you are certain is caught."* | Chunk 02: the reviewer's first mutation harness passed `--reporter=basic`, not a Vitest 5 reporter, so every run exited 1 and **all 29 mutants looked caught**. It noticed and redid the run; had it not, the review would have been confidently wrong in the direction of approving. `gates.md` requires a negative control for every *implementer* gate and has no equivalent for the reviewer's own tools. |**Applied 2026-09-20** |
+| 7 | `prompts/worktree.md` § "Creating one" (before the snippet at line 40) | Add: *"Commit and push your plan amendments first. `git worktree add` materializes the branch's **commit**, not your working tree — an uncommitted preflight fix is invisible to the implementer, and `git fetch` does not help. Confirm with `git status --short`."* | Wave 2: preflight found two gate defects, the lead fixed them in the main checkout, then created the worktree. The implementer received the **unfixed** plan. Caught only by grepping the worktree's copy on a hunch. The section anticipates staleness from *other people's merged commits* and nothing else. |**Applied 2026-09-20** |
+| 8 | `prompts/preflight.md` § "On failure" (last line) | Amend to *"Fix the plan — or the tree — **and commit the fix** — before spawning anyone."* | Same as #7. Preflight's whole job is producing plan amendments, and `execute.md` orders worktree creation immediately after it — the three files compose into a sequence where the most likely moment to hold uncommitted plan edits is the moment before the one command that cannot see them. |**Applied 2026-09-20** |
+| 9 | `prompts/preflight.md` | When preflight finds a defect in a gate block, fix every **unstarted** chunk that shares it in the same commit, and say so in the log. | Wave 2's two gate defects were fixed at `20c9ff9` in chunk 02 only. Chunks 03, 04, 05 and 06 carried the same two lines until wave 3's preflight rediscovered them. A per-chunk fix guarantees the next wave rediscovers it — which is exactly what happened. |**Applied 2026-09-20** |
+| 10 | `prompts/preflight.md` | Preflight checks the **rubric** of every chunk in the wave it is about to dispatch, not just the plan — at minimum, that the rubric cites the Convention Map when the map is non-empty. | The ORCHESTRATOR's bold standing constraint *"regenerate the rubrics for chunks 02–06 when chunk 01 merges"* was discharged for chunk 02 alone. Measured: chunk 02 had 6 Convention Map citations, chunks 03 and 04 had **0**. Chunk 05's was never run until its own wave (34 → 59 items). `plan-check` passes a plan whose rubrics are stale. |**Applied 2026-09-20** |
+| 11 | `prompts/execute.md` § Standing rules (line 303) | Widen **"Amendments travel in pairs"** to a sweep: *"A plan amendment is complete when every section that encodes the old decision has changed — Context, Acceptance Criteria, What To Do, Tasks, Deliverables, Verification Gates, and the rubric. Grep the chunk for the old noun before committing."* | Chunk 05: the design amendment rewrote the sections that *describe* Level 2 and left the sections that *specify* it. Context, four acceptance criteria, tasks T005/T006, the Reuse Audit and the Deliverables said "node"; the design section said "card". Rubric items 47/49 and 60 could not both pass, and gate 2's `grep -iE 'change.*node.*\.tsx$'` exits 1 against the correct `change-card.tsx`. A chunk graded like this fails whatever it builds. One `grep -in '<old term>'` would have caught all three. |**Applied 2026-09-20** |
+| 12 | `prompts/execute.md` § dispatching + the dispatch-brief template | State that the session scratchpad is **shared across every agent**, and require each agent to work in `<scratchpad>/<agent-name>/`, a directory it creates and owns. `execute.md` currently never mentions the scratchpad's sharing at all. | Chunk 04 reported a gate failing with a message it never wrote — its `gate2.sh` had been overwritten by chunk 03's gate 2 at the same path. Caught only because the borrowed gate *failed*; one that passed would have been recorded as evidence under a chunk it never tested. The lead's own `d.bak`/`e.bak` restore loops copy files back **into a worktree** from the same flat directory. |**Applied 2026-09-20** |
+| 13 | `templates/chunk.md` § Verification Gates | Gate scripts are chunk artifacts and belong in the **worktree**, committed alongside the chunk — not in the scratchpad. A worktree is per-chunk by construction and a committed gate is reviewable evidence. | Same as #12. This is the structural fix; #12 is the mitigation for everything else agents put in the scratchpad. |**Applied 2026-09-20** |
+| 14 | `prompts/planning.md` + `skills/plan-check` | Require a one-line rationale beside any externally-priced or externally-bounded constant (model id, timeout, page size, retry count, concurrency bound), or a pointer to the Design Decision holding it. `plan-check` flags a model id appearing in a chunk plan with no Design Decision referencing it. | Chunk 03's plan named `claude-opus-5` three times — § What To Do, task T004, § External Dependencies — with no rationale anywhere, and nothing in SPEC.md or the Design Decisions covered it. It survived planning, a planning-time review, and a rubric regeneration: three passes over the same file, none of which asked "why this model?". It was a default read back as a decision, and it was beside a *correct* pricing note, which made it look more considered. Settled as Haiku 4.5 (Design Decision 10) only when the owner asked. |**Applied 2026-09-20** |
+| 15 | `prompts/planning.md` | A chunk consuming another chunk's artifact names the **path**, not the kind — *"reads `src/lib/ingest/fixtures/<name>.transcript.json`"*, not *"the fixture chunk 02 commits"*. | Chunk 04's Context and Test Plan both referenced "the fixture snapshot committed by chunk 02". No such file existed. Chunk 02 committed an HTTP *transcript*; two chunks used one word for two artifacts. Would have cost chunk 04 its first full cycle — its very first task reads a file that isn't there. |**Applied 2026-09-20** |
+| 16 | `templates/orchestrator.md` § Plan-Specific Constraints guidance | When a plan defers `project.md` edits to the lead for parallel-wave safety, require the deferral to name **which sections** are contested. Only sections a parallel wave could both touch (Stack, Commands) need batching; Layout, Convention Map and Conventions are append-or-amend-in-place, rarely collide, and should stay in-chunk per `project.md`'s own standing rule. | Applying chunk 03's batched deltas at `539c42c` pushed the generic `lib/` paragraph under the `snapshots/` entry, so it read as a description of the snapshot directory; `src/lib/ingest/` and `src/lib/view/` were missing entirely though both had existed for waves. Two waves of implementers read a Layout block whose `lib/` rule was attached to the wrong directory. The plan overrode a documented convention for a good reason and inherited a transcription step nobody priced. |**Applied 2026-09-20** |
+| 17 | `prompts/execute.md` § Step 6.3b | The boundary check **re-derives** the Commands table from `package.json` rather than re-running what the table already lists. | `pnpm start` has existed since chunk 01 and was used at three consecutive wave boundaries to demo a story — and was never in the table. No chunk under-reported it: it is a command the *lead* uses, and the deltas protocol only asks implementers what they changed. The existing wording structurally cannot find a command that was never written down. |**Applied 2026-09-20** |
+| 18 | `prompts/execute.md` § Step 6.3b | Verifying `project.md` means **re-reading the sections this wave edited as a whole**, not confirming the new facts are present. | At the wave-3 boundary the lead checked presence, and presence was true while the structure was wrong (see #16). Also: three consecutive waves shipped a `project.md` delta that was inaccurate in a detail only reading the source catches — chunk 05's report said `derive.ts` needs two of `enrichment-record.ts`'s exports; it imports three. |**Applied 2026-09-20** |
+| 19 | `templates/completion-report.md` (or `prompts/gates.md`) | Any report containing a transcript carries a self-check: every quoted payload appears byte-for-byte in a captured file, and any two payloads presented as differing must actually differ (`diff a b`, exit status shown). | Chunk 06 failed review twice on this. Iteration 1: two "live end-to-end" transcripts showed output the code cannot emit — `/api/enrichment`'s three fields flattened to the top level, `steps` printed as the integer `1` where it is an array, and a `complete` event missing `type`/`snapshot` and carrying three fields that are not on it. The fix then **pasted the same body twice**, so a "cold vs cached" pair read `cached:false` in both while the prose claimed it flipped. Every verification gate in this project checks the code; nothing checks that the report describes what the code did — and the reviewer grades several rubric items against the report. Chunk 06 wrote exactly this script for itself and proved it non-vacuous; it should not be reinvented per chunk. |**Applied 2026-09-20** |
+| 20 | `prompts/completion.md` | Make the first step *reconcile the State table against `gh pr list`*, rather than read the table. | `/plan:complete` opened on a table reading chunk 06 `PR open` — which by the command's own branch rule means *stop, delivery does not start on a half-executed plan*. PR #7 had merged at 19:07:58Z. The plan branch was 10 commits behind its own remote, so nothing local contradicted the table either. `pr_merged` is the one transition nobody is dispatched to perform. |**Applied 2026-09-20** |
+| 21 | `prompts/execute.md` § Step 5 (or the wave-boundary checklist) | Make worktree removal a checked step with an assertion (`git worktree list` clean) rather than advice, and state the consequence inline. | `.worktrees/02-ingest-core` survived its merge and made the wave-2 boundary's `pnpm lint` report `✖ 3240 problems (148 errors, 3092 warnings)` — every file under `.worktrees/`. `.worktrees/06-live-ingest` then survived all the way to the delivery boundary and did it again. `project.md` already records the trap; the thing that removes the worktree is a human remembering. |**Applied 2026-09-20** |
+
+### Bible candidates (Step 4b)
+
+**No new bible page is proposed.** The bar is the same friction in **two** retros, and
+`plans/completed/` was empty when this ran. Two candidates to watch — if either recurs in
+the next plan's retro, it graduates from a `project.md` convention to a standard:
+
+1. **Discriminating evidence vs. absence evidence** (Heuristics 1 and 2). Would land in
+   `bibles/swe/testing.md` or a leaf beside it, with a routing row for "prove a test
+   checks something". Four chunks out of four in this plan.
+2. **A gate must not encode a design decision as a filename pattern** (Heuristic 6). Two
+   occurrences *within* this plan (chunks 04 and 05), which makes it a pattern here but
+   still one retro.
+
+**A bible page this plan found wrong** — recorded per Step 4b's reverse check:
+
+`bibles/swe/decision-tree.md:23` routes *"Design a new service or module with a public
+API"* to `patterns/service-design.md`, whose § "Interface-first (mandatory for shared
+services)" requires an interface in `contracts/`, an `@Injectable()` class and a DI provider
+token. That is the exact abstraction `ORCHESTRATOR.md` § Complexity rejects by name, and
+this project has no DI container. Chunk 01 ruled the `src/lib/**` Convention Map row ships
+with **no** `Doc` citation for this reason, and the chunk-01 reviewer independently verified
+both sources before agreeing. The routing row matches on the **vocabulary** ("a module with
+a public API") while the destination page assumes a framework the project does not use.
+**Resolved 2026-09-20: the routing rows were narrowed.** `decision-tree.md` § "Service and
+module design" now carries a scope note stating that `service-design.md` assumes a DI
+container, three rows qualified to the cases where it genuinely applies (a project *with* a
+container; an interface decision *given more than one implementation*; substitutability for
+a second *real* implementation), and a fourth row routing a module of standalone functions
+with one implementation to nothing at all. `service-design.md` itself is unchanged — it is
+correct for the projects it was written for, and the defect was that the tree sent the wrong
+projects to it.
+
+### Proposed additions to `.claude/resources/project.md`
+
+Project facts, not process changes. Most of this plan's tribal knowledge was promoted
+in-chunk or at a wave boundary and is already in the file (the `AGENTS.md` rule, the
+`catalog.generated.ts` static-import requirement, the `.worktrees/` lint trap, the
+transcript-capture procedure, `setState`-in-effect as a lint error, the zod reserved-key
+finding). Two measured gotchas from the delivery boundary are **not** there yet — both are
+verification-tooling traps that make an agent reach a wrong conclusion. **Both applied
+2026-09-20 to § Conventions:**
+
+1. **A corpus-wide `grep` in this repository is unreadable unless scoped to code
+   extensions.** Roughly half the tracked bytes are captured API output, and committed
+   snapshots contain other projects' changelogs — so a bare
+   `grep -rn 'process\.env' src/` buries the answer under matches from *inside a fixture*.
+   Use `--include='*.ts' --include='*.tsx'`. Measured 2026-09-20 at the US1 checkpoint,
+   where the scoped grep returns exactly one line (a comment in `github.ts`) and the
+   unscoped one returns a screenful.
+
+2. **`git ls-files 'src/app/**/page.tsx'` returns 0 and the file exists.** Git's `**/`
+   requires an intervening directory, so the glob misses `src/app/page.tsx` at the root.
+   Anyone re-running a Convention Map coverage check should confirm with a plain
+   `git ls-files src/app` before concluding a convention row is dead. Measured 2026-09-20
+   at the wave-4 boundary.
+
+### Process findings on `project.md` itself
+
+Per `prompts/completion.md` step 3, the delivered tree was read against `project.md` rather
+than assumed. The file is current: Stack, the Commands table, the Convention Map, Layout and
+the Principles all match the merged tree, including chunk 06's two route handlers, the
+`src/lib/live/` entry and the `enrichment-record.ts` split. Two facts that *should* have been
+written by a chunk and were instead written by the lead at a boundary are already captured as
+framework findings #17 (`pnpm start`, belonging to no chunk) and #16/#18 (the Layout
+orphaning from batched deltas), rather than being silently fixed.

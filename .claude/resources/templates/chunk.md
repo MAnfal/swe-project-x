@@ -79,6 +79,21 @@ capable of failing, which is the only thing that makes it evidence.
 Order: contract and interface tests, then integration, then unit. Record the red run's
 output in the completion report, not just the green one.
 
+**"Fails before implementation because…" must not say "the module does not exist."** That
+is true of every test written first and proves only absence. Name the *value* the
+assertion rejects. A suite that fails at import and collects zero tests has been observed
+red without being observed discriminating — see `prompts/evidence.md` § "A red run from
+tests-first ordering is necessary, not sufficient".
+
+**Name a constructed-input test per guard.** For each defensive branch this chunk will
+implement — a boundary clamp, a uniqueness check, a range guard, a normalization step —
+list a test whose input is **built by the test** rather than drawn from a committed
+fixture. A real fixture only contains the cases its source repository happened to produce,
+so the guard for the case it didn't produce is pinned by nothing and deletes green.
+
+| Guard / boundary | Constructed input that exercises it | Test |
+| ---------------- | ----------------------------------- | ---- |
+
 If this chunk genuinely has nothing testable (pure types, declarative config, docs), write
 `N/A — <reason>` here rather than leaving it blank.
 
@@ -115,6 +130,13 @@ Commands that must all pass. If any fails, the chunk is blocked — do not deliv
 
 Read `.claude/resources/prompts/gates.md` first. Capture a baseline before running
 anything that emits errors, and grade the delta.
+
+**A gate script is a chunk artifact. It lives in the worktree and is committed with the
+chunk — never in the session scratchpad.** The scratchpad is shared by every agent in the
+session, so two chunks that both name their script `gate2.sh` overwrite each other and a
+chunk reports a gate result from a script it never wrote. A worktree is per-chunk by
+construction, and a committed gate is reviewable evidence rather than an untracked file
+that can vanish between the run and the review.
 
 ```bash
 set -e
