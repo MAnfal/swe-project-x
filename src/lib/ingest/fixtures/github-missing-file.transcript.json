@@ -10,7 +10,7 @@
         "content-length": "127",
         "content-security-policy": "default-src 'none'",
         "content-type": "application/json; charset=utf-8",
-        "date": "Sun, 20 Sep 2026 09:54:57 GMT",
+        "date": "Sun, 20 Sep 2026 09:57:07 GMT",
         "referrer-policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
         "server": "github.com",
         "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
@@ -20,15 +20,19 @@
         "x-github-api-version-selected": "2022-11-28",
         "x-github-edge-region": "iad",
         "x-github-media-type": "github.v3; param=raw",
-        "x-github-request-id": "F5CE:192797:55196B4:11E18CB0:6AAFAD71",
+        "x-github-request-id": "F611:19134:53FDD21:11A4E698:6AAFADF2",
         "x-ratelimit-limit": "5000",
-        "x-ratelimit-remaining": "4836",
+        "x-ratelimit-remaining": "4807",
         "x-ratelimit-reset": "1789900631",
         "x-ratelimit-resource": "core",
-        "x-ratelimit-used": "164",
+        "x-ratelimit-used": "193",
         "x-xss-protection": "0"
       },
-      "body": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/repos/contents#get-repository-content\",\"status\":\"404\"}"
+      "json": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+        "status": "404"
+      }
     }
   ]
 }

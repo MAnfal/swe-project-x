@@ -17,8 +17,28 @@ export type TranscriptEntry = {
   url: string;
   status: number;
   headers: Record<string, string>;
-  body: string;
+  /**
+   * A JSON response is stored parsed rather than as an escaped string, so a committed
+   * transcript stays readable and greppable — `"node_id"` appears in the file as itself.
+   * Replay re-serializes it, which is semantically identical for every JSON consumer.
+   */
+  json?: unknown;
+  /** A non-JSON response — a raw file read, for instance — keeps its exact text. */
+  text?: string;
 };
+
+/** The bytes a replayed response should carry. */
+export function bodyOf(entry: TranscriptEntry): string {
+  return entry.json !== undefined ? JSON.stringify(entry.json) : (entry.text ?? '');
+}
+
+function bodyFieldsFor(body: string): Pick<TranscriptEntry, 'json' | 'text'> {
+  try {
+    return { json: JSON.parse(body) as unknown };
+  } catch {
+    return { text: body };
+  }
+}
 
 export type Transcript = { entries: TranscriptEntry[] };
 
@@ -60,7 +80,7 @@ export function recordingFetch(upstream: typeof fetch, sink: TranscriptEntry[]):
     });
 
     const [method, url] = splitKey(requestKey(input, init));
-    sink.push({ method, url, status: response.status, headers, body });
+    sink.push({ method, url, status: response.status, headers, ...bodyFieldsFor(body) });
 
     return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
   }) as typeof fetch;
@@ -83,7 +103,7 @@ export function replayFetch(transcript: Transcript): typeof fetch {
     if (!entry) {
       throw new Error(`no recorded response in transcript for ${key}`);
     }
-    return new Response(entry.body, { status: entry.status, headers: entry.headers });
+    return new Response(bodyOf(entry), { status: entry.status, headers: entry.headers });
   }) as typeof fetch;
 }
 
@@ -118,7 +138,7 @@ export function sampleTranscript(
     entries: transcript.entries.map((entry) => {
       if (!PULL_REQUEST_LIST.test(entry.url)) return entry;
 
-      const parsed: unknown = JSON.parse(entry.body);
+      const parsed = entry.json;
       if (!Array.isArray(parsed)) return entry;
 
       let others = 0;
@@ -129,7 +149,7 @@ export function sampleTranscript(
         return others <= options.sample;
       });
 
-      return { ...entry, body: JSON.stringify(kept) };
+      return { ...entry, json: kept };
     }),
   };
 }

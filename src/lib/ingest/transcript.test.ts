@@ -7,7 +7,7 @@ const entry = (url: string, body: unknown, headers: Record<string, string> = {})
   url,
   status: 200,
   headers: { 'content-type': 'application/json', ...headers },
-  body: JSON.stringify(body),
+  json: body,
 });
 
 describe('replayFetch', () => {
@@ -46,7 +46,7 @@ describe('recordingFetch', () => {
     expect(await response.json()).toEqual({ a: 1 });
     expect(sink).toHaveLength(1);
     expect(sink[0].url).toBe('https://api.github.com/x');
-    expect(sink[0].body).toBe('{"a":1}');
+    expect(sink[0].json).toEqual({ a: 1 });
   });
 
   it('never records a request header, so a token cannot reach the transcript', async () => {
@@ -76,7 +76,7 @@ describe('sampleTranscript', () => {
       { entries: [listEntry('https://api.github.com/repos/o/r/pulls?page=1', [1, 2, 3, 4, 5])] },
       { keep: new Set([2, 5]), sample: 0 },
     );
-    expect(JSON.parse(trimmed.entries[0].body).map((p: { number: number }) => p.number)).toEqual([2, 5]);
+    expect((trimmed.entries[0].json as { number: number }[]).map((p) => p.number)).toEqual([2, 5]);
   });
 
   it('keeps a sample of the others so the page still looks like a page', () => {
@@ -84,7 +84,7 @@ describe('sampleTranscript', () => {
       { entries: [listEntry('https://api.github.com/repos/o/r/pulls?page=1', [1, 2, 3, 4, 5])] },
       { keep: new Set([5]), sample: 2 },
     );
-    expect(JSON.parse(trimmed.entries[0].body).map((p: { number: number }) => p.number)).toEqual([1, 2, 5]);
+    expect((trimmed.entries[0].json as { number: number }[]).map((p) => p.number)).toEqual([1, 2, 5]);
   });
 
   it('leaves the retained objects byte-identical, incidental fields and all', () => {
@@ -92,7 +92,7 @@ describe('sampleTranscript', () => {
       { entries: [listEntry('https://api.github.com/repos/o/r/pulls?page=1', [1, 2])] },
       { keep: new Set([2]), sample: 0 },
     );
-    expect(JSON.parse(trimmed.entries[0].body)).toEqual([{ number: 2, node_id: 'n2' }]);
+    expect(trimmed.entries[0].json).toEqual([{ number: 2, node_id: 'n2' }]);
   });
 
   it('keeps the headers that drive pagination', () => {
@@ -108,7 +108,7 @@ describe('sampleTranscript', () => {
       { entries: [listEntry('https://api.github.com/repositories/197018189/pulls?page=2', [7, 8])] },
       { keep: new Set([8]), sample: 0 },
     );
-    expect(JSON.parse(trimmed.entries[0].body).map((p: { number: number }) => p.number)).toEqual([8]);
+    expect((trimmed.entries[0].json as { number: number }[]).map((p) => p.number)).toEqual([8]);
   });
 
   it('never truncates a per-pull-request sub-resource, which must stay whole', () => {
@@ -118,12 +118,12 @@ describe('sampleTranscript', () => {
       { filename: 'c.ts', additions: 3 },
     ]);
     const trimmed = sampleTranscript({ entries: [files] }, { keep: new Set<number>(), sample: 0 });
-    expect(trimmed.entries[0].body).toBe(files.body);
+    expect(trimmed.entries[0].json).toEqual(files.json);
   });
 
   it('leaves a non-array body alone', () => {
     const repo = entry('https://api.github.com/repos/o/r', { default_branch: 'main' });
-    expect(sampleTranscript({ entries: [repo] }, { keep: new Set<number>(), sample: 0 }).entries[0].body).toBe(repo.body);
+    expect(sampleTranscript({ entries: [repo] }, { keep: new Set<number>(), sample: 0 }).entries[0].json).toEqual(repo.json);
   });
 });
 
@@ -149,5 +149,18 @@ describe('recordingFetch redaction', () => {
     // …while the headers replay and pagination need survive.
     expect(sink[0].headers.link).toBe('<https://next>; rel="next"');
     expect(sink[0].headers['content-type']).toBe('application/json');
+  });
+});
+
+describe('non-JSON responses', () => {
+  it('keeps a raw text body exactly, and replays it unchanged', async () => {
+    const yaml = "packages:\n  - 'packages/*'\n";
+    const upstream = async () => new Response(yaml, { status: 200, headers: { 'content-type': 'text/plain' } });
+    const sink: TranscriptEntry[] = [];
+    await recordingFetch(upstream as unknown as typeof fetch, sink)('https://api.github.com/raw');
+
+    expect(sink[0].text).toBe(yaml);
+    expect(sink[0].json).toBeUndefined();
+    expect(await (await replayFetch({ entries: sink })('https://api.github.com/raw')).text()).toBe(yaml);
   });
 });
