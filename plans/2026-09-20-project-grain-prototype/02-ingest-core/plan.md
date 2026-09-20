@@ -69,7 +69,7 @@ argues for it, but record the change in the completion report because chunks 03�
 ```ts
 // packages: the monorepo's apps and packages, and the dependency edges between them
 // pullRequests: one entry per PR merged in the window, with attribution and raw detail
-// enrichment:   filled by chunk 03 — OPTIONAL here, keyed by merge SHA
+// enrichment:   OPTIONAL here — model-generated labels, keyed by merge SHA
 ```
 
 Required fields per pull request: number, title, body, author, merged timestamp, merge
@@ -243,10 +243,14 @@ bash -s <<'GATE'
 set -euo pipefail
 
 # Gate 1 — standard gates from project.md, type check last.
+# `pnpm test` is already `vitest run`. Do NOT write `pnpm test --run`: pnpm consumes
+# `--run` as its own option and exits with `ERROR Unknown option: 'run'` before vitest
+# starts — under `set -e` that aborts the whole gate for a reason unrelated to the work.
+# Measured 2026-09-20 on the merged chunk-01 tree. See project.md § Commands.
 pnpm lint
-pnpm test --run
+pnpm test
 pnpm build
-pnpm exec tsc --noEmit
+pnpm typecheck
 
 # Gate 2 — the fixture is captured API output, not hand-authored. Assert it carries fields
 # a hand-written fixture would not bother to include.
@@ -260,7 +264,7 @@ done
 
 # Gate 3 — no reserved key can reach a snapshot record. Assert the guard exists as code,
 # not as a comment explaining it.
-src=$(git ls-files 'src/**/*.ts' 'lib/**/*.ts' | tr '\n' ' ')
+src=$(git ls-files 'src/**/*.ts' | tr '\n' ' ')
 hits=$(grep -hE "__proto__" $src | grep -vE '^\s*(//|\*)' | wc -l | tr -d ' ')
 [ "$hits" -ge 1 ] || { echo "FAIL: no reserved-key guard in source" >&2; exit 1; }
 
