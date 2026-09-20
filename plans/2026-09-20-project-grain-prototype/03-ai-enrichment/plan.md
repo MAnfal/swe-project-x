@@ -33,6 +33,40 @@ two make the canvas navigable; this one makes it worth navigating. It is also th
 a later "golden rules" feature would filter on, which is why it is captured now even though
 that feature is out of scope.
 
+**Amended 2026-09-20 at the wave-3 preflight — read this before task T001.** Chunk 02
+merged, and its schema already declares the shape this chunk writes. Three consequences,
+all measured against `src/lib/snapshot.ts` on the plan-branch tip:
+
+- **Do not declare a second enrichment schema.** `enrichmentEntrySchema` and
+  `enrichmentSchema` are exported from `src/lib/snapshot.ts`, and `snapshotSchema.enrichment`
+  is `z.record(z.string().min(1), enrichmentEntrySchema).optional()`. Principle 5 is "one
+  snapshot schema" — import these. A model-output schema for `generateObject` may be a
+  narrower thing you derive from them, but the value written into a snapshot validates
+  against the merged one.
+- **`steps` is not a list of phrases.** The merged schema is
+  `z.array(z.object({ commitSha: z.string().min(1), summary: z.string().min(1) })).min(1)` —
+  each step carries the commit it came from. This plan's prose above describes bare phrases
+  and is wrong; **the merged schema wins**, and your model output must supply a `commitSha`
+  per step drawn from the pull request's own commits. `min(1)` also means the fallback path
+  cannot write an empty step array — decide what a degraded record's single step is, and say
+  so in the completion report. There is no maximum on `steps` in the merged schema, so if you
+  want the bound task T001 asks for, it belongs on your model-output schema, not on a second
+  copy of the snapshot's.
+- **Keys go through `assertSafeKey`/`buildRecord`, not the schema.** Both are exported from
+  `src/lib/snapshot.ts`. `project.md` records the measurement: `z.record` accepts
+  `{"__proto__": …}` and silently drops the key rather than rejecting it, and it names
+  `enrichment` as the case this applies to. Note also that `pullRequestSchema.mergeCommitSha`
+  is **nullable** — decide the key for a pull request GitHub reported no merge SHA for, and
+  make Gate 2's accessor match whatever you choose.
+
+**The committed snapshot directory is `src/lib/snapshots/`**, files named
+`<owner>-<repo>-<since-date>.json`. Chunk 04 runs in parallel and commits one un-enriched
+snapshot there, `xyflow-xyflow-2026-08-31.json`, replayed from chunk 02's transcript. It will
+not be on your base. **Do not create, edit or delete that path** — bake your three curated
+repositories under your own windows, and if your `xyflow/xyflow` window would collide with
+that filename, pick a different window. Two chunks in one parallel wave editing one file is
+the merge conflict this avoids.
+
 **The model never sits between a click and a frame.** Enrichment is keyed by merge commit
 SHA — a pull request's label does not change when the time slider moves — so it is computed
 once and reused forever. This chunk bakes it into committed snapshots for the curated
@@ -180,6 +214,8 @@ code only for the model call itself.
 | `.claude/resources/project.md` | Stack, gate commands, Principles — including "no model call in the render path" and "no secret reaches the client" |
 | `.claude/resources/bibles/swe/testing.md` | Assert the value a consumer receives, not the input handed to a mock; committed snapshots are captured pipeline output, not hand-authored fixtures |
 | `plans/2026-09-20-project-grain-prototype/02-ingest-core/plan.md` | The snapshot schema this chunk writes into, and the CLI it extends |
+| `src/lib/snapshot.ts` | The merged schema itself — `enrichmentEntrySchema`, `enrichmentSchema`, `assertSafeKey`, `buildRecord`. Import these; do not re-declare them |
+| `scripts/ingest.mts` | The CLI this chunk extends rather than replaces |
 
 ## External Dependencies
 
@@ -199,9 +235,9 @@ set -euo pipefail
 
 # Gate 1 — standard gates from project.md, type check last.
 pnpm lint
-pnpm test --run
+pnpm test
 pnpm build
-pnpm exec tsc --noEmit
+pnpm typecheck
 
 # Gate 2 — every committed snapshot carries enrichment for every pull request, and every
 # enrichment carries the approach note. Derive the counts from the file; never assert a

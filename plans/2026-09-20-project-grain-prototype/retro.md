@@ -328,6 +328,123 @@ Every one of these is a candidate for `.claude/resources/project.md`.
    the feedback, the more the re-check has to widen to stay honest.
 
 
+### Wave 2 → Wave 3 boundary
+
+Chunk 02 merged at `000da8d`. Gates re-verified on the merged tree, type check last:
+`pnpm lint` 0, `pnpm test` `Tests 94 passed (94)` across 7 files, `pnpm build` 0,
+`pnpm typecheck` 0.
+
+#### Framework friction — the wave-2 gate fix was applied to one chunk when four carried the defect
+
+Wave 2's preflight found two fatal defects in chunk 02's verification gates: `pnpm test --run`
+exits 1 with `ERROR Unknown option: 'run'` before Vitest starts, and `pnpm exec tsc --noEmit`
+was used where `project.md` declares `pnpm typecheck`. They were fixed at `20c9ff9` — **in
+chunk 02 only**. Chunks 03, 04, 05 and 06 were written from the same template and carried the
+same two lines the whole time. Wave 3's preflight found them again.
+
+Re-measured at the wave-3 boundary before fixing, rather than trusted from the earlier entry:
+`pnpm test --run` exits **1** with `ERROR Unknown option: 'run'`; `pnpm exec tsc --noEmit`
+exits **0** and is merely off-convention, not fatal. Both are now corrected in all four
+remaining chunk plans.
+
+A third defect of the same family was in chunk 04 alone: its gate 2 globbed
+`git ls-files 'src/**/*.ts' 'src/**/*.tsx' 'app/**/*.tsx' 'lib/**/*.ts'`. Measured — `src/**`
+matches 15 and 9 files; `app/**/*.tsx` and `lib/**/*.ts` match **0**, because this project
+puts both under `src/`. A gate whose file list is half-empty still exits 0 and reads as a
+pass. Narrowed to the two globs that match.
+
+**The generalization**: when preflight finds a defect in a gate block, the block was almost
+certainly copied. Fix every unstarted chunk that shares it in the same commit, and say in the
+log that you did. A per-chunk fix guarantees the next wave rediscovers it — which is exactly
+what happened here, one wave later.
+
+#### Framework friction — `pnpm lint` on the plan branch is unreadable while a worktree is live
+
+The first gate run on the merged tree reported `✖ 3240 problems (148 errors, 3092 warnings)`
+and exited 1. Nothing was wrong with the merged code. `pnpm lint` runs `eslint` with no path
+argument, so it lints the whole project directory — including `.worktrees/02-ingest-core`,
+whose PR had merged but whose worktree had not yet been removed, and that worktree's own
+`node_modules`. Every reported file was under `.worktrees/`. After `git worktree remove`, the
+same command exits 0 with no output.
+
+This is a trap specific to the **lead's** position: an implementer inside its own worktree
+never sees it, and `execute.md` puts worktree removal at Step 5 while the lead's re-verify
+happens at Step 4. Ordering the two the other way round is not possible — the worktree must
+outlive the merge. So the finding is promoted to `project.md` instead, with the scoped
+fallback `pnpm exec eslint src scripts` for when a gate must run while a worktree is live.
+
+#### Planning defect — chunk 04 was built on an artifact chunk 02 never produced
+
+Chunk 04's Context said it renders "the **fixture snapshot committed by chunk 02**", and its
+Test Plan said "All five run against the fixture snapshot chunk 02 committed." No such file
+exists and none ever did. What chunk 02 committed is a recorded **HTTP transcript**,
+`src/lib/ingest/fixtures/xyflow-xyflow-2026-08-31.transcript.json` — a different artifact for
+a different purpose. `git ls-files | grep -i snapshot` on the plan branch returns only
+`src/lib/snapshot.ts` and its spec.
+
+This is precisely the case preflight §3 exists for, and it only fires because §3 insists on
+checking the **base branch** rather than the working tree. It would have cost chunk 04 its
+first full cycle: the implementer's very first task reads a file that isn't there.
+
+The fix did not need a plan re-cut, because chunk 02 shipped a `--replay` mode. Verified by
+the lead before writing it into the brief — `node scripts/ingest.mts … --replay …` with
+`GITHUB_TOKEN` unset exits 0 and prints `10 packages, 6 pull requests`, producing a 24KB
+snapshot. So chunk 04 now generates its own snapshot from the committed transcript, offline,
+which keeps Principle 4 satisfied: it is captured output of the real producer, not a fixture
+hand-written to look like one.
+
+**What the planner actually got wrong** is worth naming precisely, because "chunk 04 assumed
+too much" is not actionable. Chunk 02's plan promised "a committed fixture", and chunk 04's
+author read that and assumed *fixture of the thing I need*. Two chunks used one word for two
+artifacts. A plan that names the **path** rather than the kind — "reads
+`src/lib/ingest/fixtures/<name>.transcript.json`" — cannot make this mistake.
+
+#### Process gap — an explicit Plan-Specific Constraint was executed for one chunk out of five
+
+ORCHESTRATOR.md § Plan-Specific Constraints says, in bold: *"Regenerate the rubrics for
+chunks 02–06 when chunk 01 merges."* When chunk 01 merged, chunk 02's rubric was regenerated
+and 03–06 were not. Measured by counting Convention Map citations per rubric: chunk 02 has 6,
+chunks 03 and 04 had **0**.
+
+Nothing caught this. `plan-check` validates structure and passes a plan whose rubrics are
+stale, and the wave-2 preflight had no reason to look at a wave-3 rubric. The constraint was
+written for the exact failure it then suffered — *"skipping this leaves every later review
+graded against a map the project no longer has an excuse for missing"* — which suggests the
+problem is not that nobody knew, but that a constraint phrased as a one-time instruction gets
+discharged against whatever chunk is in front of you.
+
+Both rubrics are now regenerated: chunk 03 gained 5 Convention Map sections plus a
+parallel-wave boundary section, chunk 04 gained 6 plus a deployment section.
+
+**Proposed framework fix**: preflight should check the rubric of every chunk in the wave it is
+about to dispatch, not just the plan — at minimum, that the rubric cites the Convention Map at
+all when the map is non-empty. Recorded for Part 2.
+
+#### Tribal knowledge — the parallel wave shares a directory, and that was a deliberate choice
+
+1. **The decision.** Chunks 03 and 04 both write committed snapshots. I put them in one
+   directory, `src/lib/snapshots/`, with window-qualified filenames, and told each chunk not
+   to touch the other's files — rather than giving each chunk its own directory.
+2. **The obvious alternative.** Chunk 04 writes a view-layer fixture under
+   `src/lib/view/fixtures/`, chunk 03 owns `src/lib/snapshots/` alone. No possibility of
+   collision, and the ORCHESTRATOR's "they share no file" claim stays literally true.
+3. **The constraint that made it right.** Chunk 04 ships the repository picker, whose
+   acceptance criterion is that it *"lists the snapshots actually present rather than a
+   hardcoded list"*. If chunk 04's only snapshot lives somewhere the picker doesn't read,
+   then at the moment chunk 04 merges the picker discovers nothing and the US1 slice is not
+   demoable on its own — which is the entire point of the Story Checkpoints table. One
+   directory is what keeps chunk 04 independently shippable. The collision risk is handled by
+   naming, not by separation.
+4. **The recognition signal.** Any parallel wave where one chunk produces data and another
+   renders "whatever is present". Separating their outputs protects the merge and breaks the
+   checkpoint; the checkpoint is worth more.
+
+**A consequence to expect, not to fix**: after both chunks merge the picker lists four
+snapshots, one of them un-enriched. That is not a defect — it is the case chunk 04's renderer
+is explicitly required to handle, now exercised by real committed data rather than only by a
+spec.
+
+
 ---
 
 ## Cold-start brief

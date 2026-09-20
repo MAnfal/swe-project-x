@@ -203,9 +203,9 @@ set -euo pipefail
 
 # Gate 1 — standard gates from project.md, type check last.
 pnpm lint
-pnpm test --run
+pnpm test
 pnpm build
-pnpm exec tsc --noEmit
+pnpm typecheck
 
 # Gate 2 — the approach note is rendered, not just carried in the data. Assert the change
 # node component reads the approach field. Adjust the field name to the schema in use.
@@ -216,7 +216,7 @@ grep -qE '\bapproach\b' "$node_src" || {
 
 # Gate 3 — a missing enrichment cannot produce an empty label. Run the derivation spec that
 # covers it and assert it executed, rather than trusting an exit code from an empty run.
-out=$(pnpm test --run 2>&1); echo "$out"
+out=$(pnpm test 2>&1); echo "$out"
 echo "$out" | grep -Eq '[1-9][0-9]* (passed|passing)' || {
   echo "FAIL: test runner reported no executed tests" >&2; exit 1; }
 GATE

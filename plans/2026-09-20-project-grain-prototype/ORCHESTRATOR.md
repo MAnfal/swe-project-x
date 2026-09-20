@@ -38,7 +38,7 @@ See `SPEC.md` in this directory.
 | Chunk | Story | Status | PR | Blocker |
 | ----- | ----- | ------ | -- | ------- |
 | 01 | Foundation | Merged | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
-| 02 | US1 | PR open | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
+| 02 | US1 | Merged | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
 | 03 | US1 | Not started | — | — |
 | 04 | US1 | Not started | — | — |
 | 05 | US1 | Not started | — | — |
@@ -77,6 +77,9 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `review_passed` | 02 | Iteration 2, fresh reviewer (never reused). 27 mutants, 23 fatal; confirmed the three fixes generalize against 8 *different* wrong implementations, that the zod premise assertion fires, and that `transcriptWithReversedListing()` permutes only what is under test. No blocking issues |
 | 2026-09-20 | `gates_passed` | 02 | Lead re-ran all four at `c1b8266` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Tests 94 passed (94)`, `pnpm build` 0, `pnpm typecheck` 0. Also re-applied 7 mutants independently — all fatal, tree byte-identical after each |
 | 2026-09-20 | `pr_created` | 02 | [#2](https://github.com/MAnfal/swe-project-x/pull/2) → `feat/plan--project-grain-prototype`, at `c1b8266` (7 commits) |
+| 2026-09-20 | `pr_merged` | 02 | #2 merged at `000da8d`. Lead re-verified the merged tree, type check last: `pnpm lint` 0, `pnpm test` `Tests 94 passed (94)` / 7 files, `pnpm build` 0, `pnpm typecheck` 0 |
+| 2026-09-20 | `wave_merged` | — | Wave 2 complete. Worktree `.worktrees/02-ingest-core` removed; `git worktree list` clean. Its presence was why the first `pnpm lint` on the merged tree reported 148 errors — all under `.worktrees/`; promoted to `project.md` |
+| 2026-09-20 | `preflight_failed` | 03, 04 | Wave 3 preflight halted on four defects. (a) Chunks 03–06 all still carried wave 2's two gate defects — the fix at `20c9ff9` was applied to chunk 02 only; re-measured, `pnpm test --run` exits 1, `pnpm exec tsc --noEmit` exits 0 but is off-convention. (b) Chunk 04's gate 2 globbed `app/**/*.tsx` and `lib/**/*.ts`, which match 0 files in a `src/`-rooted project. (c) Chunk 04 was written against a "fixture snapshot committed by chunk 02" that does not exist — chunk 02 committed a *transcript*. (d) Rubrics 03–06 were never regenerated against the Convention Map despite the explicit Plan-Specific Constraint; 02 had 6 citations, 03 and 04 had 0. All four fixed; 03 and 04 rubrics regenerated (05 and 06 regenerate before their own waves) |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,

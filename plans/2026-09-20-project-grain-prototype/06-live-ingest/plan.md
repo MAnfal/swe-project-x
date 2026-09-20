@@ -216,9 +216,9 @@ set -euo pipefail
 
 # Gate 1 — standard gates from project.md, type check last.
 pnpm lint
-pnpm test --run
+pnpm test
 pnpm build
-pnpm exec tsc --noEmit
+pnpm typecheck
 
 # Gate 2 — both route handlers declare the Node.js runtime. Find them by discovery, not by
 # a hardcoded path, and require the declaration in each.
@@ -238,7 +238,7 @@ fi
 
 # Gate 4 — ingest is bounded. Assert the maximum is applied before fetching, by running the
 # bounds spec and requiring it to have executed.
-out=$(pnpm test --run 2>&1); echo "$out"
+out=$(pnpm test 2>&1); echo "$out"
 echo "$out" | grep -Eq '[1-9][0-9]* (passed|passing)' || {
   echo "FAIL: test runner reported no executed tests" >&2; exit 1; }
 GATE
