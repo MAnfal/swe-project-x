@@ -120,6 +120,9 @@ the evidence they check something beyond import resolution:
 
 ## Gates
 
+All gate commands below are the ones the **corrected** `plan.md` declares (`pnpm typecheck`,
+not `pnpm exec tsc --noEmit`; Gate 3 globbing `src/**/*.ts` only). See § Stale plan copy.
+
 Baseline (base tree `f766371`, isolated copy at
 `$SCRATCH/base`): `pnpm lint` exit 0, `pnpm test` → `Test Files 1 passed (1) / Tests 3
 passed (3)` exit 0, `pnpm exec tsc --noEmit` exit 0. Results below are the delta: tests
@@ -130,9 +133,9 @@ passed (3)` exit 0, `pnpm exec tsc --noEmit` exit 0. Results below are the delta
 | 1 lint | `pnpm lint` | exit 0, no output | No — and it cannot. A standard gate passes on base by design. Falsified by control instead (below) |
 | 1 test | `pnpm test` | exit 0, `Test Files 7 passed (7) / Tests 84 passed (84)` | Yes, as the red run above: with this chunk's specs present and no implementation, exit 1, 6 failed suites |
 | 1 build | `pnpm build` | exit 0, `✓ Compiled successfully`, `Finished TypeScript` | No — passes on base by design. (The isolated base copy could not run it: `Symlink [project]/node_modules is invalid, it points out of the filesystem root`. That is my harness, **not** gate evidence, and is not counted as a failure) |
-| 1 typecheck | `pnpm exec tsc --noEmit` | exit 0, no output | No — passes on base by design. Falsified by control |
+| 1 typecheck | `pnpm typecheck` | exit 0, no output | No — passes on base by design. Falsified by control |
 | 2 fixture is captured output | `git ls-files \| grep -E 'fixtures?/.*\.json$'`, then `grep -qF '"node_id"'` / `'"merge_commit_sha"'` on the PR transcript, and `'"x-github-request-id"'` on every fixture | exit 0; both needles present in `xyflow-xyflow-2026-08-31.transcript.json`, request id present in both fixtures | **Yes.** On base: `committed fixtures:` empty → `FAIL: no committed fixture found`, plus `FAIL: …transcript.json is not committed`. Evidence is absence, correct for a gate proving content was added |
-| 3 reserved-key guard exists as code | `git ls-files 'src/**/*.ts' 'lib/**/*.ts' \| grep -v '\.test\.ts$'` then non-comment `__proto__` count | exit 0; 1 occurrence, `src/lib/snapshot.ts:21` | **Yes.** On base: 1 non-test source file searched, `non-comment __proto__ occurrences: 0` → `FAIL: no reserved-key guard in shipped source` |
+| 3 reserved-key guard exists as code | `git ls-files 'src/**/*.ts' \| grep -v '\.test\.ts$'` then non-comment `__proto__` count | exit 0; 1 occurrence, `src/lib/snapshot.ts:21` | **Yes.** On base: 1 non-test source file searched, `non-comment __proto__ occurrences: 0` → `FAIL: no reserved-key guard in shipped source` |
 | 4 deterministic outside metadata | `node scripts/ingest.mts --repo xyflow/xyflow --since … --until … --replay <fixture> --out runN.json` twice, strip `metadata`, `diff` | exit 0; `analyzedAt` differed (`…09:59:38.982Z` vs `…09:59:39.231Z`), bodies byte-identical at 23,897 bytes | **Yes.** On base, both runs exit 1: `Error: Cannot find module '…/scripts/ingest.mts'` |
 
 ### Negative controls — one per assertion, four steps each
@@ -147,6 +150,7 @@ revert verified byte-identical before re-running the gate.
 | Gate 1 test — broke a real assertion in `attribution.test.ts` | exit 1, `11 tests \| 1 failed` | exit 0 clean |
 | Gate 1 build — type error in `src/app/page.tsx` | exit 1, `page.tsx(71,7): error TS2322` | exit 0 clean |
 | Gate 1 typecheck — type error in `src/lib/ingest/ingest.ts` | exit 2, `ingest.ts(170,7): error TS2322` | exit 0 clean |
+| Gate 3 re-run under the corrected `src/**/*.ts`-only glob — removed `'__proto__'` | exit 1, `FAIL: no reserved-key guard in shipped source` | exit 0 clean |
 | Gate 2a — renamed `node_id` in the PR transcript | exit 1, `FAIL: … lacks "node_id"` | exit 0 clean |
 | Gate 2b — renamed `merge_commit_sha` | exit 1, `FAIL: … lacks "merge_commit_sha"` | exit 0 clean |
 | Gate 2c — renamed `x-github-request-id` in the 404 fixture | exit 1, `FAIL: … has no x-github-request-id` | exit 0 clean |
@@ -167,6 +171,25 @@ recorded because they are facts about this project's lint:
   it. Of the 113 configured rules, 60 are error-level and all but ~22 are React-specific;
   for a plain `.ts` file the applicable error rules are `no-var`, `prefer-const`,
   `prefer-rest-params`, `prefer-spread` and the `@typescript-eslint/*` set.
+
+## Stale plan copy
+
+The worktree initially held a pre-fix `plan.md`, and that is the copy I read at the start
+of the session. The lead fast-forwarded the branch onto `f766371`
+(*plan: fix chunk 02 gate commands and regenerate its rubric*) before I had committed
+anything, so **every commit in this chunk sits on top of the corrected plan**, and the
+working copy is the corrected one (line 251 reads `pnpm test`, with no `--run`).
+
+Checked each of the three fixes against what I actually delivered:
+
+| Fix | Impact on delivered work |
+| --- | --- |
+| Gate 1: `pnpm test --run` → `pnpm test` | **None.** I never invoked `pnpm test --run`; grepping my gate scripts and this report for it returns nothing. The brief warned me independently |
+| Gate 1: `pnpm exec tsc --noEmit` → `pnpm typecheck` | Same command (`package.json` declares `typecheck: tsc --noEmit`), but my first gate runs cited the undeclared spelling. Re-run with `pnpm typecheck` → exit 0; the table above records the declared command |
+| Gate 3: dropped the `lib/**/*.ts` glob | Result identical — the dropped half matched nothing, so the hit count was 1 either way. Re-ran the gate and its negative control under the `src/**/*.ts`-only glob; base still reports `0` and the control still fires |
+| Code sample: `enrichment: filled by chunk 03 …` → `… model-generated labels …` | **Not copied.** `grep -rniE 'chunk[ -]?0?[0-9]' src/ scripts/` returns nothing; `snapshot.ts` says "Written by the enrichment pass, keyed by merge commit SHA" |
+
+The full gate block was re-run end to end after these corrections: `rc=0`.
 
 ## Judgment calls
 
