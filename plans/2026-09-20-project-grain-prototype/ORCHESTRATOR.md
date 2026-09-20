@@ -39,7 +39,7 @@ See `SPEC.md` in this directory.
 | ----- | ----- | ------ | -- | ------- |
 | 01 | Foundation | Merged | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
 | 02 | US1 | Merged | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
-| 03 | US1 | PR open | [#3](https://github.com/MAnfal/swe-project-x/pull/3) | — |
+| 03 | US1 | Merged | [#3](https://github.com/MAnfal/swe-project-x/pull/3) | — |
 | 04 | US1 | In review | — | — |
 | 05 | US1 | Not started | — | — |
 | 06 | US2 | Not started | — | — |
@@ -94,6 +94,8 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `pr_created` | 03 | [#3](https://github.com/MAnfal/swe-project-x/pull/3) → `feat/plan--project-grain-prototype`, at `4133d49` (3 commits) |
 
 | 2026-09-20 | `review_iteration` | 04 | Iteration 2 **FAIL**, fresh reviewer. Confirmed iteration 1's two mutants are genuinely dead, then widened as instructed and found three new survivors in the same functions — `historyBounds`' two boundary-tie comparisons and `volumeSeries`' span guard, each 144/144 green. Lead reproduced all three and split them by reachability: `github.ts:139` filters to `[since, until)` so the ties are defensive-only, but `snapshotSchema` accepts a zero-width **and inverted** window, so the span guard is reachable and yields a silent `NaN`. Iteration 3 scoped to those three plus a reachability disclosure, with a stated stopping rule: further survivors confined to unreachable defensive code are warnings, not blockers |
+
+| 2026-09-20 | `pr_merged` | 03 | #3 merged at `45866bf`, brought onto the plan branch by merge (never rebase) at `ccaadcf`. Lead re-verified the merged tree: lint 0 (scoped `pnpm exec eslint src scripts`, because chunk 04's worktree is still live), `pnpm test` `Test Files 9 passed (9) / Tests 140 passed (140)`, `pnpm build` 0, `pnpm typecheck` 0. Worktree `.worktrees/03-ai-enrichment` removed. Chunk 03's 8 `project.md` deltas applied by the lead, with the new CLI flags verified against `scripts/ingest.mts --help` rather than trusted |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
