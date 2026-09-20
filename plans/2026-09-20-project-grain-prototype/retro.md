@@ -776,6 +776,266 @@ occurrences makes it a pattern, not an accident.
   `enrichment` means un-enriched fixture; present means it must be complete. Chunk 05 must
   not assume every catalog entry has enrichment — Level 2 renders one that does not.
 
+### Wave 4 → US1 checkpoint boundary
+
+Wave 4 closed with #6 merged at `af3cc5f`. Merged tree re-verified by the lead with the
+worktree removed, type check last: `pnpm lint` 0, `pnpm test`
+`Test Files 13 passed (13) / Tests 246 passed (246)`, `pnpm build` 0, `pnpm typecheck` 0.
+
+#### US1 checkpoint holds — demoed end to end, and the negative clause was measured
+
+The checkpoint reads *"pick a pre-analyzed repository, scrub to any window, see which
+packages changed, expand one to its changes with labels and approach notes, expand a change
+to its ordered steps. No token, no network, no model call."* Driven by the lead in a browser
+against `pnpm start`, not delegated: landing page → `shadcn-ui/ui` → Level 1 → the 30d
+preset → focus `v4` → Level 2 → Level 3 for #11582. Every clause rendered.
+
+The part worth recording is the **negative** clause, because "no network, no model call" is
+the kind of claim a screenshot cannot make. Three independent checks, not one:
+`read_network_requests` captured **zero** requests across all three level transitions;
+`find src/app -name route.ts` returns nothing, so there is no endpoint to call; and
+`grep -rn -e 'process\.env' -e 'fetch(' --include='*.ts' --include='*.tsx' src/` outside
+specs hits exactly one line — a *comment* in `github.ts` stating the token is a parameter.
+`pnpm build` independently corroborates it: `/` and `/_not-found` are both `○ (Static)`.
+
+**Method note for the next checkpoint.** The first grep was run without `--include`, and the
+committed snapshot JSON — which contains other projects' changelogs — buried the answer
+under a screenful of `process.env` matches from *inside a fixture*. A corpus-wide grep in
+this repository is unreadable unless it is scoped to code extensions, because roughly half
+the tracked bytes are captured API output. Scope first, then read.
+
+#### Framework friction — the boundary check found a gap that no chunk was ever going to report
+
+`execute.md` § Step 6.3b tells the lead to re-verify `project.md` against the merged tree,
+framed as *"the check that each chunk did its part"*. Applying chunk 05's two declared
+deltas took that framing literally. But re-running the Commands table turned up a third
+gap that belongs to **no chunk**: `pnpm start` has existed in `package.json` since chunk 01
+and has been used at three consecutive wave boundaries to demo a story — and was never in
+the table. No chunk under-reported it; it is a command the *lead* uses, and the deltas
+protocol only ever asks implementers what they changed.
+
+Also worth recording: chunk 05's report said `derive.ts` needs **two** of
+`enrichment-record.ts`'s exports. It imports **three** (`enrichmentKey`,
+`fallbackEnrichment`, `isFallbackEnrichment`). Harmless here, and the delta went in
+corrected — but it is the third wave running in which a reported `project.md` delta was
+inaccurate in a detail that only reading the source catches. The rule that saved it is
+`evidence.md`'s, not the protocol's: measure the claim before you write it down.
+
+**Proposed** (for Part 2, evidence above): the boundary step should say the lead re-derives
+the Commands table from `package.json` rather than re-running what the table already lists.
+The existing wording only finds commands that *changed*; it structurally cannot find one
+that was never written down.
+
+#### Carry-forward claims re-derived at this boundary
+
+- **Convention Map globs still match the tree.** Re-counted with `git ls-files`:
+  `src/lib/**/*.ts` 24, `src/components/**/*.tsx` 20, `src/**/*.test.ts` 13,
+  `src/components/ui/**` 7, `scripts/**` 2, `src/**/*.generated.ts` 1.
+- **Two rows match zero files, both correctly.** `src/app/**/route.ts` — chunk 06 has not
+  built a route yet, and it is the row that governs the one it will build. `src/**/*.test.tsx`
+  — no component spec exists; the `src/components/**/*.tsx` row does not require one (only
+  the `src/lib/**/*.ts` row demands a co-located spec), so this is a row waiting for its
+  first file, not a violation.
+- **A `git ls-files` count of `src/app/**/page.tsx` is 0 and this is a tooling artifact, not
+  a missing file.** Git's `**/` requires an intervening directory, so the glob misses
+  `src/app/page.tsx` at the root. Anyone re-running this check should confirm with a plain
+  `git ls-files src/app` before concluding a convention row is dead.
+- **Stack versions unchanged**; chunk 05 added no dependency, no command, no new file kind.
+
+---
+
+### Chunk 06 — Live analysis
+
+Two review iterations, both **FAIL then PASS on the same axis** — and neither was about
+behaviour. This is the first chunk in the plan whose blocking findings were entirely about
+the *report*.
+
+#### The streak broke, and a different one started
+
+Chunks 02, 03, 04 and 05 each failed their first review on an unpinned defensive branch.
+Chunk 06 did not. The dispatch brief carried that carry-forward explicitly, the implementer
+mutation-tested before review, and iteration 1's reviewer went hunting for the same failure
+mode and could not find it — it mutated a guard the report never claimed to cover
+(`createGitHubClient`'s empty-request check, 5 files / 32 tests red) and confirmed the
+three "deleted rather than pinned" branches were genuinely unreachable. **The carry-forward
+worked.** That is the strongest evidence in this plan that the journal pays for itself.
+
+What replaced it: **evidence that could not have been produced.**
+
+#### The defect, and the fact that it recurred inside its own fix
+
+Iteration 1 blocked on two "live end-to-end" transcripts showing output the code cannot
+emit. `/api/enrichment` returns `{key, entry:{label,approach,steps}, cached, fallback}`;
+the report flattened those three fields to the top level and printed `steps` as the integer
+`1` where it is an array of `{commitSha, summary}`. The `complete` event's declared type is
+`{type, snapshot, bound, repository, branch}`; the transcript dropped `type` and `snapshot`
+and added `packages`, `prs` and `enrichment`, which are not fields on it. Cause: the
+implementer piped both probes through `node -e` formatters, kept the formatter's output and
+discarded the raw bytes.
+
+The fix re-captured them — and **pasted the same body twice**. The two "raw and complete"
+enrichment responses were byte-identical, the second reading `cached:false` directly above
+prose claiming it flipped to `true`. The captured files were right; the heredoc was not.
+
+The lead caught it by extracting both quoted bodies and comparing them programmatically
+(`body1 == body2 → True`) rather than reading them, then establishing ground truth against
+a cold instance: `cached=False` at 2.598946 s, `cached=True` at 0.003946 s.
+
+#### What made the second fix different: the method changed, not the text
+
+Per `prompts/review.md`, a recurrence at a new site after a fix at the cited one is where
+citations stop. The lead required distinct capture paths per response, `diff` with its exit
+status shown, script-generated report blocks, and an extended audit of the newly written
+prose.
+
+That is the part worth generalizing, because **re-running found defects that re-reading had
+not**, including one neither review cited: a `complete`-event key list formatted by Python's
+`json.dumps` while presented as node's `JSON.stringify` output — the two space their
+separators differently. The implementer's own 33-claim audit found 12 bad claims, of which
+only 2 were the ones cited; a third instance of the invented-field defect
+(`"enrichment":"absent"`) was self-caught.
+
+**The parts built to be falsified survived every independent re-run intact — the gates, the
+mutation table. It was the prose around them that drifted.** Evidence discipline has to
+reach the narrative, not just the checks.
+
+#### Framework friction — the loop has no gate on report fidelity
+
+Every verification gate in this project checks the *code*. Nothing checks that the
+completion report describes what the code did, and the report is what the reviewer grades
+several rubric items against. Both failures here were caught by a human-equivalent reading
+plus an ad-hoc `python3` comparison the lead improvised twice. Chunk 06's `project.md`
+delta 10 turns the capture procedure into a convention, which is the right layer — but a
+convention is advice, and this chunk violated the advisory version of it twice in a row
+before the mechanical one stuck.
+
+**Proposed** (Part 2): `prompts/gates.md` or the completion-report template should carry a
+self-check for any report containing a transcript — every quoted payload must appear
+byte-for-byte in a captured file, and any two payloads presented as differing must
+actually differ. Chunk 06 wrote exactly that script for itself and proved it non-vacuous by
+running it against the previous commit (`the two are byte-identical: True → self-check
+would exit 1`). It should not have to be reinvented per chunk.
+
+#### The one surviving mutation, and why it is a warning
+
+Iteration 2 mutated away `askedRef` in `grain-workspace.tsx:207` — the "already asked this
+session" guard — and nothing failed, because `project.md` deliberately excludes `pnpm test`
+from the component gate and no chunk in this plan has component specs. The reviewer framed
+it as the one piece of model-spend bounding that is not machine-checked.
+
+The lead narrowed that before accepting it. Line 208's `hasOwnProperty` check on the merged
+`enrichment` record independently blocks a re-expand after a success, and the server's
+per-instance cache blocks the model call even when a request is made. `askedRef` uniquely
+covers the **in-flight double-expand** and the **instance-recycled-mid-session** case. Real,
+but not "spend is unguarded". Filed as
+`plans/ideas/bound-live-route-spend-and-concurrency.md` together with the two the
+implementer flagged, since all three are the same concern — nothing bounds what one
+anonymous request can spend.
+
+#### Carry-forward correction the lead owed
+
+The implementer's report said the ingest fan-out means "200 concurrent GitHub requests".
+Files and commits are awaited sequentially *within* each pull request's chain, so it is
+~100 concurrent chains issuing 200 requests in total. Both reviewers agreed with the
+correction. The finding itself is real and correctly left alone: the lead verified the
+`Promise.all` is untouched by chunk 06's diff and came from chunk 02 (`549d507`).
+
+---
+
+---
+
+### Delivery boundary — Part 1
+
+#### The State table lied, and only GitHub knew
+
+`/plan:complete` opened on a table reading chunk 06 `PR open`, which by its own branch rule
+means *stop, delivery does not start on a half-executed plan*. PR #7 had in fact merged at
+19:07:58Z. The plan branch was 10 commits behind its own remote, so nothing local
+contradicted the table either. What caught it was checking the PR's real state
+(`gh pr view 7 --json state,mergedAt`) rather than trusting the file — the same
+measure-before-you-write rule the chunk-06 journal ends on, applied to bookkeeping instead
+of to a report.
+
+**Proposed** (Part 2): the first step of `prompts/completion.md` should be to reconcile the
+State table against `gh pr list`, not to read the table. A state machine whose state is
+hand-written drifts exactly once per hand-written transition, and the `pr_merged` event is
+the one transition nobody is dispatched to perform — every other row is written by an agent
+who was just told to do the thing.
+
+#### A merged chunk's worktree was still on disk at delivery
+
+`.worktrees/06-live-ingest` survived its PR merge, and `project.md` already records what
+that does: `pnpm lint` takes no path argument, walks the worktree and its `node_modules`,
+and reports thousands of problems that belong to nobody. Removed before the gates ran. The
+convention says a worktree is removed "as soon as its PR lands" — it is written as advice,
+and the thing that actually removes it is a human remembering. Same shape as the finding
+above.
+
+#### Gates on the merged tree
+
+`main` held no commits the plan branch lacked, so the source-branch merge was a no-op and
+the assembled tree is the plan branch as-is. All four green after the worktree removal,
+type check last: `pnpm lint` exit 0 silent, `pnpm test` `Test Files 19 passed (19)` /
+`Tests 379 passed (379)`, `pnpm build` exit 0 with `/` still `○ (Static)` and both routes
+`ƒ (Dynamic)`, `pnpm typecheck` exit 0. Tree clean afterwards, so `prebuild` regenerating
+`catalog.generated.ts` produced no diff.
+
+#### The US2 checkpoint, driven at delivery rather than claimed
+
+The story-checkpoint box for US2 was still unticked; chunk 06's own PR was opened on a lead
+browser run, but the checkpoint belongs to the assembled tree. Driven against
+`PORT=3100 pnpm start` on the merged build, using two repositories that are **not**
+pre-analyzed so nothing could be served from a committed snapshot:
+
+- `radix-ui/primitives` — live, `53 of 53 pull requests` in the 90-day window, inside the
+  100 ceiling. `trpc/trpc` — live, `36 of 36`. Both logged by the route itself.
+- Progress is **per pull request**, not per batch: the NDJSON stream carried 57 `progress`
+  events and one `complete` for the 53-PR run, against a success metric asking for one per
+  ten. Named steps with their own detail (`main`, `40 packages · 106 dependency edges`),
+  a percentage and `Step 3 of 5` — captured on screen mid-run, not inferred from the stream.
+- On-demand enrichment: `[Enrichment] radix-ui/primitives#710e50b… generated` appears
+  **once** in the server log across two expansions of the same change, which is the
+  "at most once per pull request per session" metric measured rather than asserted.
+- The no-network metric was measured from the browser, not argued: a full Level 1 → 2 → 3
+  walk of the pre-analyzed `shadcn-ui/ui` produced 12 requests, all `localhost:3100` plus
+  the Chrome extension's own injected script. Fonts are self-hosted under
+  `/_next/static/media/`, so there is no Google Fonts request to forget about. No
+  `[Analysis]` or `[Enrichment]` line appeared in the server log during that walk.
+
+#### Two things worth seeing that no chunk review could have
+
+Both are properties of the *assembly*, which is what the whole-diff pass exists for:
+
+- **The empty state and the "jump to that window" affordance carry the live path too.**
+  Selecting 30d on `radix-ui/primitives` landed on a genuinely empty window, and the panel
+  named the nearest activity (`Jul 16 – Aug 15 · 27 changes`) with a button to it. That is
+  a US1 acceptance criterion satisfied by a US2 repository — the single-snapshot-schema
+  principle paying out, visible only because the two stories were exercised on one tree.
+- **Legibility degrades with package count, and the design's answer is dimming, not
+  hiding.** `shadcn-ui/ui` at 5 packages is clear. `radix-ui/primitives` at 68 packages and
+  513 dependency edges, with 66 touched in a 90-day window, is a hairball at Level 1 — the
+  SPEC's revised clarification chose dimming over edge-hiding precisely to avoid this, and
+  at this scale dimming has almost nothing left to dim. Not a defect against any acceptance
+  criterion, and not fixed here: filed rather than absorbed.
+
+#### Whole-diff review of the assembled branch
+
+Chunks 01–04 already shipped to `main` as PR #5, so the final PR carries chunks 05 and 06:
+49 files, 7734 insertions. Checked for the cross-chunk contradictions per-chunk review
+structurally cannot see, and found none:
+
+- Every number `README.md` states was re-derived from the code it documents, not from the
+  plan: `claude-haiku-4-5` (`enrichment.ts:60`), window `90`/`365`
+  (`request.ts:103,110`), pull requests `100`/`500` (`snapshot.ts:25,30`), `runtime`
+  `'nodejs'` and `maxDuration` `300`/`60` on the two routes. All agree.
+- The never-`@/` rule holds where it binds: every `@/` specifier in the tree is in a route
+  handler or a `*.test.ts`, and no non-test `src/lib/**` module uses one.
+- Principles 1, 2 and 3 re-checked against the assembled tree by grep: no credential read
+  outside `src/app/api/**` and `scripts/`, no `NEXT_PUBLIC_*`, no `ai`/`@ai-sdk` import
+  under `src/components/`, no `child_process` or filesystem write under `src/`. The single
+  `ANTHROPIC_API_KEY` hit outside the allowed paths is the comment in `enrichment.ts:40`
+  documenting the rule.
+
 ---
 
 ## Cold-start brief

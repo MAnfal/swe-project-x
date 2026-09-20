@@ -10,6 +10,8 @@ import {
   ReactFlow,
   type Edge,
 } from '@xyflow/react';
+import { ArrowRightIcon } from 'lucide-react';
+import { cn } from 'cn';
 import { useCallback, useEffect, useMemo } from 'react';
 
 import { neighbourhood, type WindowView } from '@/lib/view/derive';
@@ -31,6 +33,8 @@ type TopologyCanvasProps = {
   /** The package whose neighbourhood is shown alone, or null for the whole graph. */
   focused: string | null;
   onFocus: (packageName: string | null) => void;
+  /** Opens Level 2 for a package. Design page 4: the focused node offers it, `→` fires it. */
+  onExpand: (packageName: string) => void;
 };
 
 const EDGE_DEPENDENCY = 'oklch(0.6 0.02 260)';
@@ -43,21 +47,31 @@ const MINIMAP_COLORS = {
   untouched: 'oklch(0.85 0 0)',
 } as const;
 
-export function TopologyCanvas({ view, focused, onFocus }: TopologyCanvasProps) {
+export function TopologyCanvas({ view, focused, onFocus, onExpand }: TopologyCanvasProps) {
   const toggleFocus = useCallback(
     (packageName: string) => onFocus(packageName === focused ? null : packageName),
     [focused, onFocus],
   );
 
-  // Escape leaves focus mode, as the focus pill says it does.
+  // The keyboard model design page 4 prints in the level indicator: `→` expands the
+  // focused package, `←` and Escape leave focus mode. Neither fires while a text field has
+  // focus, so chunk 06's repository URL input is not hijacked by them.
   useEffect(() => {
     if (focused === null) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onFocus(null);
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA)$/.test(target.tagName))) {
+        return;
+      }
+      if (event.key === 'Escape' || event.key === 'ArrowLeft') onFocus(null);
+      if (event.key === 'ArrowRight') onExpand(focused);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focused, onFocus]);
+  }, [focused, onFocus, onExpand]);
+
+  const focusedActivity = focused === null ? null : view.activity.find((entry) => entry.package === focused);
+  const focusedChanges = (focusedActivity?.direct ?? 0) + (focusedActivity?.indirect ?? 0);
 
   const { nodes, edges } = useMemo(() => {
     const near = focused === null ? null : neighbourhood(view, focused);
@@ -174,13 +188,30 @@ export function TopologyCanvas({ view, focused, onFocus }: TopologyCanvasProps) 
 
       {focused === null ? null : (
         <Panel position="top-center">
-          <div
-            role="status"
-            className="flex items-center gap-2 rounded-full border border-amber-500/60 bg-card/90 px-3 py-1.5 text-xs shadow-sm backdrop-blur"
-          >
-            <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
-            Focused on <span className="font-medium">{focused}</span> — showing its neighbours only
-            <kbd className="rounded border px-1 font-mono text-[10px] text-muted-foreground">Esc</kbd>
+          <div className="flex flex-col items-center gap-2">
+            <div
+              role="status"
+              className="flex items-center gap-2 rounded-full border border-amber-500/60 bg-card/90 px-3 py-1.5 text-xs shadow-sm backdrop-blur"
+            >
+              <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+              Focused on <span className="font-medium">{focused}</span> — showing its neighbours only
+              <kbd className="rounded border px-1 font-mono text-[10px] text-muted-foreground">Esc</kbd>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onExpand(focused)}
+                className={cn(
+                  'flex cursor-pointer items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium shadow-sm',
+                  'hover:border-amber-500/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
+                )}
+              >
+                Expand {focusedChanges} {focusedChanges === 1 ? 'change' : 'changes'}
+                <ArrowRightIcon aria-hidden className="size-3" />
+              </button>
+              <span className="font-mono text-[11px] text-muted-foreground">or press →</span>
+            </div>
           </div>
         </Panel>
       )}

@@ -34,14 +34,29 @@ export function parseRepositoryRef(input: string): RepositoryRef {
  * `fetch` is injectable so the same client can be driven from a recorded transcript.
  * Verified against @octokit/rest 22.0.1: `request.fetch` is honoured, and `paginate`
  * follows the `link` header returned by the injected implementation.
+ *
+ * `signal` rides the same channel and reaches every request the client makes: the
+ * constructor merges `options.request` into its request defaults
+ * (`@octokit/core` 7.0.8, `dist-src/index.js`: `request: Object.assign({}, options.request, …)`),
+ * and `@octokit/request` 10.0.16 passes `requestOptions.request?.signal` straight to
+ * `fetch` (`dist-src/fetch-wrapper.js:30`). That is how a route handler stops paying for
+ * a repository whose reader has closed the tab.
  */
-export function createGitHubClient(options: { token: string; fetch?: typeof fetch }): GitHubClient {
+export function createGitHubClient(options: {
+  token: string;
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
+}): GitHubClient {
   if (!options.token) {
     throw new Error('createGitHubClient requires a token — it never falls back to the environment');
   }
+  const request = {
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
+  };
   return new Octokit({
     auth: options.token,
-    ...(options.fetch ? { request: { fetch: options.fetch } } : {}),
+    ...(Object.keys(request).length > 0 ? { request } : {}),
   });
 }
 
@@ -99,6 +114,17 @@ export type WindowBounds = {
   maxPullRequests: number;
 };
 
+export type MergedPullRequests = {
+  /** At most `maxPullRequests`, newest merge first. */
+  pullRequests: RawPullRequest[];
+  /**
+   * How many the window really held, before the ceiling applied. Reported because the
+   * ceiling is invisible otherwise: a caller cannot tell a repository with exactly the
+   * maximum from one with ten times it, and the reader is owed that difference.
+   */
+  matched: number;
+};
+
 /**
  * Merged pull requests whose merge landed inside the window, newest merge first.
  *
@@ -121,7 +147,7 @@ export async function fetchMergedPullRequests(
   client: GitHubClient,
   ref: RepositoryRef,
   bounds: WindowBounds,
-): Promise<RawPullRequest[]> {
+): Promise<MergedPullRequests> {
   const matched: RawPullRequest[] = [];
 
   for await (const page of client.paginate.iterator(client.rest.pulls.list, {
@@ -146,7 +172,7 @@ export async function fetchMergedPullRequests(
   }
 
   matched.sort(compareByMergeRecency);
-  return matched.slice(0, bounds.maxPullRequests);
+  return { pullRequests: matched.slice(0, bounds.maxPullRequests), matched: matched.length };
 }
 
 /**

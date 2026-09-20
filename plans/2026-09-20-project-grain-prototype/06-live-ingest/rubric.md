@@ -1,7 +1,8 @@
-<!-- The reviewer reads this. The implementer never does. Items state the RULE being
-     verified, not an example copied from the plan. -->
+<!-- The reviewer reads this. The implementer never does, and plan.md must not
+     reference it. Separate documents prevent teaching to the test.
+     Items state the RULE being verified, not an example copied from the plan. -->
 
-# Chunk 06 — Live analysis — Review Rubric
+# Chunk 06 — Live analysis — repository URL entry, bounded ingest, on-demand enrichment — Review Rubric
 
 Grade each item PASS, FAIL, or N/A with the reason. A FAIL needs the evidence that
 produced it: the file, the line, and what's wrong.
@@ -34,53 +35,136 @@ often as it passes a violation.
 
 ## Test Coverage Checks
 
-- [ ] Unit tests for repository URL parsing covering accepted forms and rejection of a
-      non-GitHub host, a malformed path, and blank input
-- [ ] A unit test asserting ingest stops at the configured maximum and reports the
-      truncation
-- [ ] Unit tests for the enrichment cache covering a hit producing no model call and
-      eviction at the configured bound
-- [ ] A unit test asserting a failed enrichment call returns the pull-request title marked
-      as a fallback
+One item per module gaining new behavior. Specs are co-located as `<module>.test.ts` under
+`src/` — `vitest.config.mts` includes exactly `src/**/*.test.{ts,tsx}`, so a spec outside
+`src/` is never discovered and passes by not running.
+
+- [ ] Unit tests for the repository-URL parser/validator, co-located with it, covering the
+      accepted forms **and** each rejection class separately: a non-GitHub host, a path
+      with extra segments beyond owner/repo, and a blank value
+- [ ] Unit tests for the bounded-ingest wrapper, co-located with it, asserting the maximum
+      is applied **before** fetching begins and that the truncation is reported in the
+      returned value — not merely logged
+- [ ] Unit tests for the enrichment cache, co-located with it, asserting (a) a second
+      request for the same merge SHA produces no model call and (b) the cache evicts at
+      its bound rather than growing without limit
+- [ ] A spec covering the enrichment fallback: a failing enrichment yields the pull
+      request's title marked as a fallback, never a blank node
+- [ ] Every one of the above asserts on **the record the consumer receives**, never that a
+      mock was called, and never by reading back a literal the test itself passed in —
+      `.claude/resources/bibles/swe/testing.md`
+- [ ] No test reaches the real GitHub or Anthropic API; stubbing is at the client boundary
+- [ ] Each defensive branch introduced by this chunk has a **constructed-input** test that
+      pins it. A branch no fixture reaches is a branch a mutation survives — this is the
+      failure mode that produced the first review FAIL on chunks 02, 03, 04 and 05
 
 ## Chunk-Specific Checks
 
-- [ ] Live analysis runs the existing ingest and enrichment code; no second pipeline,
-      schema, or prompt is introduced
-- [ ] Ingest performed during a request is deterministic only — enrichment is deferred to
-      expansion and never blocks the analysis response
-- [ ] Bounds are applied before fetching begins rather than by aborting an unbounded loop,
-      and the result reports when the bound truncated it
-- [ ] Both route handlers declare the Node.js runtime and an explicit maximum duration
-      consistent with the platform ceiling
-- [ ] The submitted URL is validated at the boundary before becoming an API path or a cache
-      key, and the cache is bounded —
+### Route handlers — `src/app/**/route.ts`
+
+- [ ] Each route handler declares `export const runtime = 'nodejs'` — the Edge runtime
+      supports neither Octokit nor the AI SDK
+- [ ] Each route handler is **thin**: it sequences and wires `src/lib/` functions and holds
+      no domain logic. If a business rule changed, the edit would land in `src/lib/`, not
+      in the handler — `.claude/resources/bibles/swe/patterns/orchestrator-pattern.md`
+- [ ] Every fetch is bounded **before** it starts, not by breaking out of an unbounded loop
+      partway through (Principle 6)
+- [ ] Credentials are read in the route handler and nowhere below it; no `src/lib/` or
+      `src/components/` module reads `process.env` for a token or key (Principle 1)
+- [ ] The function's maximum duration is declared explicitly rather than left to the
+      platform default
+
+### Boundary validation — the URL is request-derived data that becomes an API path and a cache key
+
+- [ ] The submitted URL is validated at the boundary before use, reduced to owner and
+      repository only, and rejected with a stated reason otherwise —
       `.claude/resources/sops/planning/boundary-validation.md`
-- [ ] Credentials are read only inside server-side code and do not appear in the built
-      client bundle; the gate proving this searched a directory that exists
-- [ ] The enrichment cache is keyed by merge SHA using the existing key derivation, and a
-      miss is handled as normal rather than as an error
-- [ ] Progress is reported with specific phases and counts rather than an indeterminate
-      state
-- [ ] `Other…` swaps the dropdown in place for the URL input with a back arrow to its left;
-      the arrow restores the dropdown and its previous selection
-- [ ] Failure states name what went wrong and leave the dropdown usable
-- [ ] No surface claims that analysis continues after the tab closes or that a retry resumes
-      partially fetched work; retry restarts, and no durable job state was introduced
-- [ ] No request-time dependency on a writable filesystem, a git subprocess, or a
-      background worker
-- [ ] No test calls the real GitHub or model API, and assertions are on returned records —
-      `.claude/resources/bibles/swe/testing.md`
-- [ ] `project.md` was not edited by this chunk; deltas are reported for the wave boundary
-- [ ] The judgment calls the plan enumerated are each explained in the completion report
+- [ ] The enrichment cache rejects reserved keys (`__proto__`, `constructor`, `prototype`)
+      and is built so a hostile key cannot reach the prototype
+- [ ] The cache is bounded in size at the point it is constructed, not policed after the
+      fact
 
-- [ ] The completion report states whether the mid-fi designs were supplied before the
-      presentation components were built, or that the user directed the chunk to proceed
-      without them; where the designs contradicted the plan, the contradiction is recorded
+### `src/lib/**/*.ts`
 
-- [ ] The screens this chunk builds match the committed mid-fi designs; any place the
-      designs contradicted the chunk plan is named in the completion report, with the
-      design followed rather than the plan
+- [ ] Standalone functions over plain objects — no class hierarchy, registry, or provider
+      interface with a single implementation
+- [ ] No `fs` write and no `child_process` (Principle 3)
+- [ ] Reads no credential — a token or model arrives as a parameter (Principle 1)
+- [ ] Imports a sibling by **relative specifier with an explicit `.ts` extension**, never
+      `@/`
+- [ ] Each new module has a co-located spec
+
+### `src/components/**/*.tsx`
+
+- [ ] No `ai` / `@ai-sdk/*` import and no model call on any component path (Principle 2).
+      The client requests enrichment over the route, it does not generate it
+- [ ] No `process.env` read of a credential (Principle 1)
+- [ ] Renders a schema-validated snapshot rather than a raw API shape (Principle 5) — the
+      live path produces the same validated snapshot the baked path does
+- [ ] A state distinction is never carried by colour alone
+- [ ] Any shadcn primitive used is generated by the CLI, not hand-authored or hand-edited;
+      an existing primitive is reused rather than patched
+
+### Acceptance criteria
+
+- [ ] `Other…` appears in the repository dropdown, and choosing it replaces the dropdown
+      **in place** with a URL input carrying a back arrow to its left
+- [ ] The back arrow restores the dropdown with its previous selection intact
+- [ ] A validation error renders against the input **without discarding what was typed**
+- [ ] Progress is reported at least once per ten pull requests processed and names what is
+      happening — not an indeterminate spinner
+- [ ] After a live analysis completes, the canvas behaves exactly as it does for a baked
+      snapshot: slider, all three levels, and the direct/indirect badges
+- [ ] A change expanded for the first time generates its label, approach note and steps on
+      demand; expanded again in the same session it makes **no further model call**
+- [ ] A window holding more pull requests than the configured maximum stops at the maximum
+      and says so in the UI, rather than fetching without bound
+- [ ] An invalid URL, an unreadable repository, and an exhausted rate limit are each
+      reported with what went wrong, and the dropdown remains usable afterwards
+- [ ] A retry restarts the analysis, and **no surface claims partial progress was kept or
+      that work continues after the tab closes** — the plan forbids resumable or detached
+      analysis, so copy implying either is a FAIL even where the design pages show it
+- [ ] No credential name appears in the built client bundle
+
+### Design conformance — resolved contradiction, read this before grading
+
+The designs (`plans/2026-09-20-project-grain-prototype/design/mid-fi.pdf`, pages 1, 2, 3
+and 8) were drawn before the no-background-jobs constraint was settled, and pages 3 and 8
+carry copy that implies detached or resumable work. The plan resolves this explicitly:
+**build the design's layout, write copy that matches what the prototype actually does.**
+Grade accordingly — do not fail copy for diverging from pages 3 and 8, and do not pass
+copy that promises behaviour the prototype lacks.
+
+- [ ] The repository field states, progress view and error surfaces follow the **layout and
+      hierarchy** of design pages 1, 2, 3 and 8
+- [ ] Where the implementation departs from the design, the completion report records the
+      contradiction rather than diverging silently
+- [ ] The report states that the design pages were opened before the presentation
+      components were written
+
+### Reuse
+
+- [ ] Ingest and the snapshot schema are imported, not reimplemented — a second ingest path
+      in this chunk is a defect
+- [ ] The enrichment function and its merge-SHA key derivation are imported, not
+      re-derived; a second enrichment prompt is a defect
+- [ ] The existing repository picker is extended, not replaced
+- [ ] The existing level and card components render the live result unchanged
+- [ ] Each reuse is recorded in the completion report as `Reuse: importing <X> from <Y>`,
+      and every new module is justified
+
+### Documentation and deltas
+
+- [ ] A README section covers running locally and deploying, naming both environment
+      variables. The README is stock `create-next-app` boilerplate on the base branch — it
+      is replaced, not appended to, and no stale boilerplate section survives that
+      contradicts it
+- [ ] The completion report carries a "project.md deltas" section. **`.claude/resources/project.md`
+      itself is NOT edited in this chunk** — the plan assigns that to the lead at the wave
+      boundary, so an edit to it is out-of-scope, and an absent deltas section is the
+      omission
+- [ ] Every claim in the deltas section names the command that measured it, not a
+      recollection
 
 ## Verdict
 

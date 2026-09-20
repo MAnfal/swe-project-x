@@ -2,16 +2,30 @@ import { describe, expect, it } from 'vitest';
 
 import {
   activityOf,
+  changeOf,
   deriveWindow,
   historyBounds,
   nearestActivity,
   neighbourhood,
+  packageChanges,
   presetRange,
+  stepChain,
+  summarizeChange,
   volumeSeries,
   type DateRange,
 } from '@/lib/view/derive';
+import { enrichmentKey, fallbackEnrichment, isFallbackEnrichment } from '@/lib/ai/enrichment';
 
-import { loadSnapshot, snapshotWithDeclaredWindow } from './fixture';
+import {
+  enrichedSnapshot,
+  loadSnapshot,
+  snapshotMissingEnrichmentFor,
+  snapshotWithDeclaredWindow,
+  snapshotWithEnrichment,
+  snapshotWithExtraEdges,
+  snapshotWithTitle,
+  snapshotWithoutMergeCommitSha,
+} from './fixture';
 
 const snapshot = loadSnapshot();
 
@@ -422,5 +436,409 @@ describe('nearestActivity', () => {
 
   it('returns null when the range already has activity', () => {
     expect(nearestActivity(snapshot, historyBounds(snapshot))).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// Chunk 05 — Level 2 (the changes that reached a package) and Level 3 (how one was built).
+// ---------------------------------------------------------------------------------------
+
+const enriched = enrichedSnapshot();
+const ENRICHED_WHOLE = { from: '2026-06-22T00:00:00Z', to: '2026-09-20T00:00:00Z' };
+const enrichedView = deriveWindow(enriched, ENRICHED_WHOLE);
+
+/** The un-enriched capture: chunk 04's fixture, which has no `enrichment` key at all. */
+const bareView = deriveWindow(snapshot, WHOLE);
+
+describe('packageChanges — the changes that reached a package (T001)', () => {
+  it('returns one entry per pull request that reached the package in the range', () => {
+    const changes = packageChanges(enriched, enrichedView, '@xyflow/react');
+    const activity = activityOf(enrichedView, '@xyflow/react');
+
+    expect(changes).toHaveLength(activity.direct + activity.indirect);
+    expect(changes).toHaveLength(36);
+    expect(new Set(changes.map((change) => change.number)).size).toBe(changes.length);
+  });
+
+  it('orders the changes by merge date, oldest first', () => {
+    const changes = packageChanges(enriched, enrichedView, '@xyflow/react');
+    const merged = changes.map((change) => Date.parse(change.mergedAt));
+
+    expect(merged).toEqual([...merged].sort((a, b) => a - b));
+    expect(changes[0].mergedAt < changes[changes.length - 1].mergedAt).toBe(true);
+  });
+
+  it('says why each change was included — directly, or through a named package', () => {
+    const changes = packageChanges(enriched, enrichedView, 'react-examples');
+    const direct = changes.find((change) => change.number === 5978);
+    const indirect = changes.find((change) => change.number === 5992);
+
+    expect(direct?.inclusion).toEqual({ kind: 'direct' });
+    expect(indirect?.inclusion).toEqual({
+      kind: 'indirect',
+      through: '@xyflow/react',
+      path: ['react-examples', '@xyflow/react'],
+    });
+  });
+
+  it('carries the enrichment label and the approach note in full', () => {
+    const change = packageChanges(enriched, enrichedView, '@xyflow/react').find((c) => c.number === 5994);
+
+    expect(change?.label).toBe('Reset store functions on flow unmount');
+    expect(change?.approach).toBe(
+      'Extended the store reset logic to properly clear all properties including edge options when the ' +
+        'flow component unmounts, ensuring clean state for remounting.',
+    );
+    expect(change?.fallback).toBe(false);
+    expect(change?.author).toBe('moklick');
+    expect(change?.url).toBe('https://github.com/xyflow/xyflow/pull/5994');
+    expect(change?.stepCount).toBe(3);
+  });
+
+  it('lists the packages the change spanned, with the expanded one first when it was touched directly', () => {
+    const change = packageChanges(enriched, enrichedView, '@xyflow/react').find((c) => c.number === 5994);
+
+    expect(change?.packages).toEqual(['@xyflow/react', '@xyflow/svelte', 'svelte-examples']);
+  });
+
+  it('puts the expanded package last when the change only reached it through a dependency', () => {
+    const change = packageChanges(enriched, enrichedView, 'react-examples').find((c) => c.number === 5992);
+
+    expect(change?.packages).toEqual(['@xyflow/react', '@xyflow/svelte', '@xyflow/system', 'react-examples']);
+  });
+
+  it('totals the lines the change added and removed', () => {
+    const change = packageChanges(enriched, enrichedView, '@xyflow/react').find((c) => c.number === 5994);
+    const pullRequest = changeOf(enrichedView, 5994);
+
+    expect(change?.additions).toBe(pullRequest.files.reduce((sum, file) => sum + file.additions, 0));
+    expect(change?.deletions).toBe(pullRequest.files.reduce((sum, file) => sum + file.deletions, 0));
+  });
+
+  it('returns nothing for a package no change reached in the range', () => {
+    expect(packageChanges(enriched, enrichedView, '@xyflow/tsconfig')).toEqual([]);
+  });
+
+  it('throws for a package the snapshot does not contain', () => {
+    expect(() => packageChanges(enriched, enrichedView, 'not-a-package')).toThrow(/no package named/);
+  });
+
+  it('throws when asked to summarize a change that never reached the package', () => {
+    // playwright is a real package, and pull request 5994 never reached it — directly or
+    // through a dependency — so there is no inclusion reason to report.
+    expect(() => summarizeChange(enriched, changeOf(enrichedView, 5994), 'playwright')).toThrow(
+      /never reached "playwright"/,
+    );
+  });
+
+  it('returns the same list when it runs twice', () => {
+    expect(packageChanges(enriched, enrichedView, '@xyflow/react')).toEqual(
+      packageChanges(enriched, enrichedView, '@xyflow/react'),
+    );
+  });
+});
+
+describe('packageChanges — the fallback path (T002)', () => {
+  it('falls back to the pull request title for a snapshot with no enrichment at all', () => {
+    const changes = packageChanges(snapshot, bareView, '@xyflow/react');
+
+    expect(snapshot.enrichment).toBeUndefined();
+    expect(changes.length).toBeGreaterThan(0);
+    for (const change of changes) {
+      expect(change.fallback).toBe(true);
+      expect(change.approach).toBeNull();
+      expect(change.label).toBe(change.title);
+      expect(change.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('falls back for one pull request when the snapshot has enrichment for the others', () => {
+    // Constructed: the committed snapshots are "absent, or complete — never partial", so
+    // no captured fixture carries this shape. `snapshotSchema` admits it, and Principle 5
+    // says the view renders anything the schema validates.
+    const partial = snapshotMissingEnrichmentFor([5994]);
+    const view = deriveWindow(partial, ENRICHED_WHOLE);
+    const changes = packageChanges(partial, view, '@xyflow/react');
+    const missing = changes.find((change) => change.number === 5994);
+    const present = changes.find((change) => change.number === 5972);
+
+    expect(missing?.fallback).toBe(true);
+    expect(missing?.approach).toBeNull();
+    expect(missing?.label).toBe('fix(store): reset functions');
+    expect(present?.fallback).toBe(false);
+    expect(present?.approach).not.toBeNull();
+  });
+
+  it('treats a degraded enrichment record as a fallback rather than as a real label', () => {
+    const pullRequest = changeOf(enrichedView, 5994);
+    const degraded = snapshotWithEnrichment({
+      [pullRequest.mergeCommitSha as string]: fallbackEnrichment(pullRequest),
+    });
+    const view = deriveWindow(degraded, ENRICHED_WHOLE);
+    const change = packageChanges(degraded, view, '@xyflow/react').find((c) => c.number === 5994);
+
+    expect(change?.fallback).toBe(true);
+    expect(change?.approach).toBeNull();
+    expect(change?.label).toBe('fix(store): reset functions');
+  });
+
+  it('recognises the degraded record the real bake actually wrote', () => {
+    // trpc/trpc#7592 has no commits, so no step chain could be derived and the bake stored
+    // a fallback. It reached no package, so it never appears on a Level 2 card list — but
+    // it is the one captured receipt that the predicate the derivation branches on is the
+    // same one the bake writes, which is what keeps the constructed tests above honest.
+    const trpc = loadSnapshot('trpc-trpc-2026-06-22.json');
+    const degraded = Object.entries(trpc.enrichment ?? {}).filter(([, entry]) =>
+      isFallbackEnrichment(entry),
+    );
+
+    expect(degraded).toHaveLength(1);
+    const [key] = degraded[0];
+    const pullRequest = trpc.pullRequests.find((candidate) => enrichmentKey(candidate) === key);
+    expect(pullRequest?.number).toBe(7592);
+    expect(pullRequest?.commits).toEqual([]);
+
+  });
+
+  it('never yields an empty label, even when the pull request has no title', () => {
+    // Constructed: every captured pull request has a non-empty title, so the fixture alone
+    // cannot reach the branch that names the change by its number.
+    const untitled = snapshotMissingEnrichmentFor([5994]);
+    const blanked = snapshotWithTitle(5994, '   ');
+    const merged = { ...blanked, enrichment: untitled.enrichment };
+    const view = deriveWindow(merged, ENRICHED_WHOLE);
+    const change = packageChanges(merged, view, '@xyflow/react').find((c) => c.number === 5994);
+
+    expect(change?.label).toBe('Pull request #5994');
+    expect(change?.fallback).toBe(true);
+  });
+
+  it('keys enrichment by pull request number when GitHub reported no merge commit', () => {
+    // Constructed: no captured pull request has a null `mergeCommitSha`, and the schema
+    // declares the field nullable.
+    const keyed = snapshotWithoutMergeCommitSha([5994]);
+    const view = deriveWindow(keyed, ENRICHED_WHOLE);
+    const change = packageChanges(keyed, view, '@xyflow/react').find((c) => c.number === 5994);
+
+    expect(change?.key).toBe('5994');
+    expect(change?.fallback).toBe(false);
+    expect(change?.label).toBe('Reset store functions on flow unmount');
+  });
+});
+
+describe('stepChain — how one change was built (T003)', () => {
+  it('returns the enrichment steps in order, numbered from one', () => {
+    const chain = stepChain(enriched, changeOf(enrichedView, 5994), '@xyflow/react');
+
+    expect(chain.steps.map((step) => step.position)).toEqual([1, 2, 3]);
+    expect(chain.steps.map((step) => step.summary)).toEqual([
+      'Reset all properties in Svelte Flow store when unmounting',
+      'Reset defaultEdgeOptions in React store',
+      'Reset functions in React store',
+    ]);
+    expect(chain.steps.map((step) => step.shortSha)).toEqual(['17d3792', '19f9c2a', '2acefb5']);
+  });
+
+  it('links each step to its own commit on the pull request', () => {
+    const chain = stepChain(enriched, changeOf(enrichedView, 5994), '@xyflow/react');
+
+    expect(chain.steps[0].url).toBe(
+      'https://github.com/xyflow/xyflow/pull/5994/commits/17d3792673d0e6b3df26b4739c287329fd74df16',
+    );
+  });
+
+  it('accounts for every changed file exactly once across the chain', () => {
+    const pullRequest = changeOf(enrichedView, 5994);
+    const chain = stepChain(enriched, pullRequest, '@xyflow/react');
+    const covered = chain.steps.flatMap((step) => step.files).map((file) => file.path);
+
+    expect([...covered].sort()).toEqual(pullRequest.files.map((file) => file.path).sort());
+    expect(chain.additions).toBe(pullRequest.files.reduce((sum, file) => sum + file.additions, 0));
+    expect(chain.deletions).toBe(pullRequest.files.reduce((sum, file) => sum + file.deletions, 0));
+    expect(chain.steps.reduce((sum, step) => sum + step.additions, 0)).toBe(chain.additions);
+    expect(chain.steps.reduce((sum, step) => sum + step.deletions, 0)).toBe(chain.deletions);
+  });
+
+  it('marks the first step whose files the expanded package owns as the entry point', () => {
+    const chain = stepChain(enriched, changeOf(enrichedView, 5994), '@xyflow/react');
+    const owned = chain.steps.filter((step) =>
+      step.files.some((file) => file.package === '@xyflow/react'),
+    );
+
+    expect(owned.length).toBeGreaterThan(0);
+    expect(chain.entryStep).toBe(owned[0].position);
+    expect(chain.steps.filter((step) => step.entryPoint).map((step) => step.position)).toEqual([
+      owned[0].position,
+    ]);
+  });
+
+  it('never marks more than one step as the entry point, for any change in the capture', () => {
+    // The invariant that makes "the first step whose files that package owns" unambiguous:
+    // a package's files are one group and a group goes to one step. Swept over every
+    // touched package and every change it carries, not over one hand-picked pair.
+    let checked = 0;
+    for (const activity of enrichedView.activity.filter((entry) => entry.state !== 'untouched')) {
+      for (const change of packageChanges(enriched, enrichedView, activity.package)) {
+        const chain = stepChain(enriched, changeOf(enrichedView, change.number), activity.package);
+        const marked = chain.steps.filter((step) => step.entryPoint);
+
+        expect(marked.length).toBeLessThanOrEqual(1);
+        expect(chain.entryStep).toBe(marked[0]?.position ?? null);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(100);
+  });
+
+  it('reports no entry point when the change never named the expanded package', () => {
+    const pullRequest = changeOf(enrichedView, 5992);
+    const chain = stepChain(enriched, pullRequest, 'react-examples');
+
+    expect(pullRequest.files.some((file) => file.package === 'react-examples')).toBe(false);
+    expect(chain.entryStep).toBeNull();
+    expect(chain.steps.every((step) => step.entryPoint === false)).toBe(true);
+  });
+
+  it('orders the file groups dependency-first, so the chain runs from dependency to dependent', () => {
+    const chain = stepChain(enriched, changeOf(enrichedView, 5994), '@xyflow/react');
+    const order = chain.steps.flatMap((step) => step.packages);
+
+    // svelte-examples declares a dependency on @xyflow/svelte, so it follows it; the files
+    // owned by no package come last.
+    expect(order).toEqual(['@xyflow/react', '@xyflow/svelte', 'svelte-examples', null]);
+  });
+
+  it('gives the leftover file groups to the earliest steps, not the last ones', () => {
+    // The remainder boundary in `assignGroups`. Not a defensive branch: 13 of the enriched
+    // changes across the committed snapshots have more file groups than steps with a
+    // non-zero remainder, and which steps absorb the extra decides what renders under each
+    // step number. The two changes below are picked because they separate the rules —
+    // #5994 leaves one group over and #5978 leaves two, and with only one left over
+    // several wrong distributions coincide.
+    //
+    // #5994: 4 groups over 3 steps. Leading-first gives 2,1,1; trailing-first gives 1,1,2.
+    const one = stepChain(enriched, changeOf(enrichedView, 5994), '@xyflow/react');
+
+    expect(one.steps.map((step) => step.packages)).toEqual([
+      ['@xyflow/react', '@xyflow/svelte'],
+      ['svelte-examples'],
+      [null],
+    ]);
+    expect(one.steps.map((step) => step.files.length)).toEqual([3, 3, 2]);
+
+    // #5978: 5 groups over 3 steps. Leading-first gives 2,2,1; trailing-first gives 1,2,2.
+    const two = stepChain(enriched, changeOf(enrichedView, 5978), '@xyflow/react');
+
+    expect(two.steps.map((step) => step.packages)).toEqual([
+      ['@xyflow/react', 'playwright'],
+      ['svelte-examples', 'react-examples'],
+      [null],
+    ]);
+    expect(two.steps.map((step) => step.files.length)).toEqual([3, 3, 1]);
+  });
+
+  it('splits the groups evenly when the step count divides them', () => {
+    // The other side of the same arithmetic. #5918 has 6 groups over 2 steps, so the
+    // remainder is zero and every step takes exactly `base` — an off-by-one in the
+    // remainder term cannot hide behind an uneven split here.
+    const chain = stepChain(enriched, changeOf(enrichedView, 5918), '@xyflow/react');
+
+    expect(chain.steps.map((step) => step.packages)).toEqual([
+      ['@xyflow/react', '@xyflow/svelte', 'playwright'],
+      ['react-examples', 'svelte-examples', null],
+    ]);
+  });
+
+  it('yields an empty chain rather than throwing when the change has no enrichment', () => {
+    const pullRequest = bareView.pullRequests[0];
+    const chain = stepChain(snapshot, pullRequest, '@xyflow/react');
+
+    expect(chain.steps).toEqual([]);
+    expect(chain.entryStep).toBeNull();
+    expect(chain.change.fallback).toBe(true);
+    // The change's own files are still reported, so Level 3 is not a blank screen.
+    expect(chain.files.map((file) => file.path).sort()).toEqual(
+      pullRequest.files.map((file) => file.path).sort(),
+    );
+  });
+
+  it('yields an empty chain for a degraded enrichment record', () => {
+    const pullRequest = changeOf(enrichedView, 5994);
+    const degraded = snapshotWithEnrichment({
+      [pullRequest.mergeCommitSha as string]: fallbackEnrichment(pullRequest),
+    });
+
+    expect(stepChain(degraded, pullRequest, '@xyflow/react').steps).toEqual([]);
+  });
+
+  it('leaves the leading steps without files when the chain is longer than the file groups', () => {
+    // Constructed: a six-step chain over a pull request whose files belong to two packages
+    // plus the repository root. No captured record pairs those two numbers.
+    const pullRequest = changeOf(enrichedView, 5994);
+    const long = snapshotWithEnrichment({
+      [pullRequest.mergeCommitSha as string]: {
+        label: 'Reset store functions on flow unmount',
+        approach: 'Extended the store reset logic.',
+        steps: pullRequest.commits
+          .concat(pullRequest.commits)
+          .slice(0, 6)
+          .map((commit, index) => ({ commitSha: commit.sha, summary: `Step ${index + 1}` })),
+      },
+    });
+    const chain = stepChain(long, pullRequest, '@xyflow/react');
+
+    expect(chain.steps).toHaveLength(6);
+    expect(chain.steps.slice(0, 2).every((step) => step.files.length === 0)).toBe(true);
+    // Right-aligned: the chain still ends on the last file group, and nothing is lost.
+    expect(chain.steps.flatMap((step) => step.files)).toHaveLength(pullRequest.files.length);
+  });
+
+  it('falls back to the pull request link for a step naming a commit it does not contain', () => {
+    // Constructed: `resolveSteps` rejects such a record at bake time, so no captured
+    // snapshot carries one. The schema does not cross-check the two fields.
+    const pullRequest = changeOf(enrichedView, 5994);
+    const stray = snapshotWithEnrichment({
+      [pullRequest.mergeCommitSha as string]: {
+        label: 'Reset store functions on flow unmount',
+        approach: 'Extended the store reset logic.',
+        steps: [{ commitSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', summary: 'A commit that is not here' }],
+      },
+    });
+    const chain = stepChain(stray, pullRequest, '@xyflow/react');
+
+    expect(chain.steps[0].url).toBe('https://github.com/xyflow/xyflow/pull/5994');
+  });
+
+  it('still covers every file when the declared dependencies form a cycle', () => {
+    // Constructed: the captured manifests declare an acyclic graph, so the topological
+    // ordering's cycle branch is unreachable from any fixture.
+    const pullRequest = changeOf(enrichedView, 5994);
+    const cyclic = snapshotWithExtraEdges([
+      { from: '@xyflow/svelte', to: 'svelte-examples', kind: 'dependencies' },
+    ]);
+    const chain = stepChain(cyclic, pullRequest, '@xyflow/react');
+
+    expect(chain.steps.flatMap((step) => step.files).map((file) => file.path).sort()).toEqual(
+      pullRequest.files.map((file) => file.path).sort(),
+    );
+    expect(chain.steps.flatMap((step) => step.packages)).toContain('svelte-examples');
+  });
+
+  it('returns the same chain when it runs twice', () => {
+    const pullRequest = changeOf(enrichedView, 5994);
+
+    expect(stepChain(enriched, pullRequest, '@xyflow/react')).toEqual(
+      stepChain(enriched, pullRequest, '@xyflow/react'),
+    );
+  });
+});
+
+describe('changeOf', () => {
+  it('returns the pull request the view carries for a number', () => {
+    expect(changeOf(enrichedView, 5994).title).toBe('fix(store): reset functions');
+  });
+
+  it('throws rather than returning undefined for a number outside the range', () => {
+    expect(() => changeOf(bareView, 1)).toThrow(/no change numbered/);
   });
 });

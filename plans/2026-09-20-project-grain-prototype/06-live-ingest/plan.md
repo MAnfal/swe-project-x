@@ -231,7 +231,18 @@ done
 
 # Gate 3 — no credential reaches the client bundle. Assert against the built output, not
 # against source, and use the variable names rather than any value.
+#
+# The corpus assertion is part of the gate, not a note: a clean `grep` over a directory
+# that does not exist is indistinguishable from a clean grep over one that does. This is
+# the failure mode project.md names as "the single most common way a gate in this project
+# proves nothing", and it has already shipped twice in this plan.
 pnpm build >/dev/null
+bundle_files=$(find .next/static -type f -name '*.js' 2>/dev/null | wc -l | tr -d ' ')
+[ "$bundle_files" -gt 0 ] || {
+  echo "FAIL: .next/static holds no .js files — the search path is wrong, so a clean" >&2
+  echo "      result here would prove nothing. Find where this Next version emits the" >&2
+  echo "      client bundle and point the gate at that." >&2; exit 1; }
+echo "gate 3 corpus: $bundle_files client .js files under .next/static"
 if grep -rlE 'ANTHROPIC_API_KEY|GITHUB_TOKEN' .next/static 2>/dev/null; then
   echo "FAIL: a credential name appears in the client bundle" >&2; exit 1
 fi
@@ -244,8 +255,10 @@ echo "$out" | grep -Eq '[1-9][0-9]* (passed|passing)' || {
 GATE
 ```
 
-Adjust gate 3's build-output path to whatever the framework version actually emits — confirm
-the directory exists before relying on it, or the gate passes by searching nothing.
+Gate 3's corpus assertion is written into the gate above. Measured at the wave-5 preflight
+on Next.js 16.3.5: `.next/static` exists after `pnpm build` and holds 24 files, so the
+assertion passes today rather than masking a wrong path. If a framework upgrade moves the
+client bundle, the gate now fails loudly instead of passing by searching nothing.
 
 **Prove each gate can fail.** Run every gate against the base commit and record the exact
 command, exit status, and failure evidence — no route handlers exist on base, so gate 2
