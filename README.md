@@ -8,6 +8,24 @@ levels: the package topology with what was touched, the changes that reached one
 and the ordered steps that produced one change. It ships with pre-analyzed snapshots and
 can analyze any public GitHub repository on demand.
 
+## Submission
+
+**→ [Resources and execution history](https://swe-project-x.vercel.app/submission)** — one page
+with everything below, including the eight build transcripts as rendered HTML. The transcripts
+do not render on GitHub, so read them there rather than here.
+
+| | |
+| --- | --- |
+| **Prototype** | https://swe-project-x.vercel.app |
+| **Design rationale** | [Google Doc](https://docs.google.com/document/d/1B6-XtsuPth4XSiOevKFVXq4RyE39KCGvYjSAGURytJ4/edit?usp=sharing) — why this theme, what makes it non-obvious, the tradeoffs, and what's next |
+| **Spec-driven development** | [The method this was built with](https://anfalmushtaq.com/articles/primitives-of-spec-driven-development) |
+| **Mid-fi design** | [Claude artifact](https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1) — what the canvas was built against |
+| **Prototype brainstorm** | [PDF](https://swe-project-x.vercel.app/submission/prototype-brainstorm.pdf) — the session that scoped the spec |
+| **Build transcripts** | [Eight Claude Code sessions](https://swe-project-x.vercel.app/submission#execution), 08:01–19:44 on 2026-09-20 |
+
+The spec, the six chunk plans, every review iteration and the retro are checked in under
+[`plans/completed/2026-09-20-project-grain-prototype/`](plans/completed/2026-09-20-project-grain-prototype/).
+
 ## Running locally
 
 Requires Node.js 24 (`.mts` scripts run under bare Node) and pnpm 9.

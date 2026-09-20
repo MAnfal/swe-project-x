@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grain — Submission</title>
+<meta name="description" content="Resources and full execution history for Grain, a codeowner visibility prototype.">
+<link rel="icon" href="/favicon.ico">
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #252525;
+    --muted: #8e8e8e;
+    --border: #e9e9e9;
+    --card: #ffffff;
+    --card-hover: #fafafa;
+    --accent: #252525;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101010;
+      --fg: #ededed;
+      --muted: #8e8e8e;
+      --border: #272727;
+      --card: #171717;
+      --card-hover: #1d1d1d;
+      --accent: #ededed;
+      --shadow: none;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 72px 16px 96px; }
+
+  /* ---- hero ---- */
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+  h1 { font-size: 2.25rem; line-height: 1.15; letter-spacing: -.02em; margin: 0 0 14px; font-weight: 600; }
+  .lede { font-size: 1.0625rem; color: var(--muted); margin: 0 0 28px; max-width: 34em; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-radius: 8px;
+    font-size: .9375rem; font-weight: 500; text-decoration: none;
+    border: 1px solid var(--border); background: var(--card);
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .btn:hover { background: var(--card-hover); }
+  .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .btn-primary:hover { opacity: .88; background: var(--accent); }
+
+  /* ---- sections ---- */
+  section { margin-top: 64px; }
+  h2 { font-size: 1.25rem; letter-spacing: -.01em; margin: 0 0 6px; font-weight: 600; }
+  .section-note { color: var(--muted); font-size: .9375rem; margin: 0 0 22px; }
+
+  /* ---- resource cards ---- */
+  .cards { display: grid; gap: 10px; }
+  .card {
+    display: block; text-decoration: none;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--card); box-shadow: var(--shadow);
+    padding: 16px 18px;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .card:hover { background: var(--card-hover); border-color: var(--muted); }
+  .card-title { font-weight: 600; font-size: .9375rem; display: flex; align-items: baseline; gap: 8px; }
+  .card-desc { display: block; color: var(--muted); font-size: .875rem; margin-top: 3px; }
+  .tag {
+    font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; white-space: nowrap;
+  }
+
+  /* ---- execution timeline ---- */
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .step { position: relative; padding: 0 0 4px 44px; }
+  .step:not(:last-child)::before {
+    content: ""; position: absolute; left: 13px; top: 30px; bottom: -4px;
+    width: 1px; background: var(--border);
+  }
+  .step-num {
+    position: absolute; left: 0; top: 4px;
+    width: 27px; height: 27px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--card);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted);
+  }
+  .step + .step { margin-top: 22px; }
+  .step-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+  .step-title { font-weight: 600; font-size: .9375rem; text-decoration: none; }
+  .step-title:hover { text-decoration: underline; }
+  .step-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .step-desc { color: var(--muted); font-size: .875rem; margin: 4px 0 0; }
+  .step-link { font-size: .8125rem; display: inline-block; margin-top: 7px; }
+
+  footer {
+    margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: .8125rem;
+  }
+  footer a { text-decoration: underline; text-underline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Software Engineering Take-Home</p>
+  <h1>Grain</h1>
+  <p class="lede">
+    See what happened in your packages while you weren&rsquo;t looking — and how each change
+    was built. A time-scrubbable map of a monorepo for the person who owns it.
+  </p>
+  <div class="actions">
+    <a class="btn btn-primary" href="/">Open the prototype</a>
+    <a class="btn" href="https://github.com/MAnfal/swe-project-x" target="_blank" rel="noopener">View the code</a>
+  </div>
+
+  <section>
+    <h2>Relevant resources</h2>
+    <p class="section-note">The written rationale, the thinking that preceded the build, and the design it was built against.</p>
+    <div class="cards">
+
+      <a class="card" href="https://docs.google.com/document/d/1B6-XtsuPth4XSiOevKFVXq4RyE39KCGvYjSAGURytJ4/edit?usp=sharing" target="_blank" rel="noopener">
+        <span class="card-title">Design rationale <span class="tag">Doc</span></span>
+        <span class="card-desc">Why this theme, what makes the idea non-obvious, the tradeoffs I made, and where I&rsquo;d take it next.</span>
+      </a>
+
+      <a class="card" href="https://anfalmushtaq.com/articles/primitives-of-spec-driven-development" target="_blank" rel="noopener">
+        <span class="card-title">Primitives of spec-driven development <span class="tag">Article</span></span>
+        <span class="card-desc">My own writing on the method this project was built with — the loop the eight sessions below run on.</span>
+      </a>
+
+      <a class="card" href="https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1" target="_blank" rel="noopener">
+        <span class="card-title">Mid-fi design <span class="tag">Artifact</span></span>
+        <span class="card-desc">The interactive mid-fidelity design the canvas was built against, before any code existed.</span>
+      </a>
+
+      <a class="card" href="prototype-brainstorm.pdf" target="_blank" rel="noopener">
+        <span class="card-title">Prototype brainstorm <span class="tag">PDF</span></span>
+        <span class="card-desc">The session that turned a vague pain point into a scoped spec — problem framing, what got cut, and why.</span>
+      </a>
+
+    </div>
+  </section>
+
+  <section>
+    <h2 id="execution">Execution</h2>
+    <p class="section-note">
+      Eight Claude Code sessions, all on 20 September 2026, from 08:01 to 19:44. Every one is
+      a complete transcript — the prompts, the model&rsquo;s reasoning, the tool calls, and the
+      reviews that sent work back.
+    </p>
+
+    <ol class="steps">
+
+      <li class="step">
+        <span class="step-num">1</span>
+        <div class="step-head">
+          <a class="step-title" href="transcripts/step1-prototype-v1-brainstorm/index.html">Brainstorm &amp; spec</a>
+          <span class="step-time">08:01 – 09:27</span>
+        </div>
+        <p class="step-desc">
+          Where the idea got pinned down. The problem is that a codeowner loses the shape of
+          their domain while they&rsquo;re away from it. This session settled the scope — two user
+          stories, three levels of disclosure, and the decision that Grain reports and never
+          blocks, gates or judges — and wrote it into a spec before any code existed.
+        </p>
+        <a class="step-link" href="transcripts/step1-prototype-v1-brainstorm/index.html">Read transcript →</a>
+      </li>
+
+      <li class="step">
+        <span class="step-num">2</span>
+        <div class="step-head">
+          <a class="step-title" href="transcripts/step2-boilerplate-creation/index.html">Boilerplate</a>
+          <span class="step-time">09:15 – 09:39</span>
+        </div>
+        <p class="step-desc">
+          Next.js, Tailwind, shadcn/ui and Vitest, plus the verification gates every later
+          chunk has to pass. Nothing interesting happens here, and that&rsquo;s the point — the
+          scaffolding gets its own session so it doesn&rsquo;t leak into the work that matters.
+        </p>
+        <a class="step-link" href="transcripts/step2-boilerplate-creation/index.html">Read transcript →</a>
+      </li>
+
+      <li class="step">
+        <span class="step-num">3</span>
+        <div class="step-head">
+          <a class="step-title" href="transcripts/step3-ingest-core/index.html">Ingest core</a>
+          <span class="step-time">09:39 – 15:30</span>
+        </div>
+        <p class="step-desc">
+          The deterministic half, and the longest session of the day: the snapshot schema, the
+          GitHub client, monorepo topology discovery, and attributing each pull request to the
+          packages it touched — directly or through a dependency. No model involved anywhere in
+          it, which is what makes the layer above it testable.
+        </p>
+        <a class="step-link" href="transcripts/step3-ingest-core/index.html">Read transcript →</a>
+      </li>
+
+      <li class="step">
+        <span class="step-num">4</span>
+        <div class="step-head">
+          <a class="step-title" href="transcripts/step4-ai-enrichment-and-canvas-topology/index.html">Enrichment &amp; canvas topology</a>
+          <span class="step-time">15:37 – 17:03</span>
+        </div>
+        <p class="step-desc">
+          Two chunks running in parallel off the same base. One taught the model to name what a
+          change was and the approach behind it; the other drew the package canvas and the time
+          slider. The canvas chunk took three rounds of review before it passed.
+        </p>
+        <a class="step-link" href="transcripts/step4-ai-enrichment-and-canvas-topology/index.html">Read transcript →</a>
+      </li>
+
+      <li class="step">
+        <span class="step-num">5</span>
+        <div class="step-head">
+          <a class="step-title" href="transcripts/step5-canvas-levels/index.html">Canvas levels</a>
+          <span class="step-time">17:06 – 18:00</span>
+        </div>
+        <p class="step-desc">
+          Levels two and three: the changes that reached one package, and the ordered chain of
+          steps that produced one change. This is the session where the core story became
+          something you could actually demo.
+        </p>
+        <a class="step-link" href="transcripts/step5-canvas-levels/index.html">Read transcript →</a>
+      </li>
+
+      <li class="step">
+        <span class="step-num">6</span>
+        <div class="step-head">
+          <a class="step-title" href="transcripts/step6-live-ingest/index.html">Live analysis</a>
+          <span class="step-time">18:06 – 19:09</span>
+        </div>
+        <p class="step-desc">
+          Paste any public GitHub repository and have it analyzed on demand, streaming progress
+          as it goes. Every ingest is bounded before the first fetch starts, because it runs
+          inside a serverless function with a hard duration ceiling.
+        </p>
+        <a class="step-link" href="transcripts/step6-live-ingest/index.html">Read transcript →</a>
+      </li>
+
+      <li class="step">
+        <span class="step-num">7</span>
+        <div class="step-head">
+          <a class="step-title" href="transcripts/step7-final-pr-to-main/index.html">Final PR to main</a>
+          <span class="step-time">19:10 – 19:29</span>
+        </div>
+        <p class="step-desc">
+          Six merged chunks assembled into one pull request against main, with the deployed
+          build checked before it went up.
+        </p>
+        <a class="step-link" href="transcripts/step7-final-pr-to-main/index.html">Read transcript →</a>
+      </li>
+
+      <li class="step">
+        <span class="step-num">8</span>
+        <div class="step-head">
+          <a class="step-title" href="transcripts/step8-plan-complete/index.html">Retro &amp; close-out</a>
+          <span class="step-time">19:34 – 19:44</span>
+        </div>
+        <p class="step-desc">
+          The retro: what the loop got right, what it cost, and the framework changes that came
+          out of it — applied in the same session rather than left as notes for a next time.
+        </p>
+        <a class="step-link" href="transcripts/step8-plan-complete/index.html">Read transcript →</a>
+      </li>
+
+    </ol>
+  </section>
+
+  <footer>
+    Built by <a href="https://anfalmushtaq.com" target="_blank" rel="noopener">Anfal Mushtaq</a> ·
+    <a href="https://github.com/MAnfal/swe-project-x" target="_blank" rel="noopener">github.com/MAnfal/swe-project-x</a>
+  </footer>
+
+</div>
+</body>
+</html>

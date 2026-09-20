@@ -456,7 +456,10 @@ src/
 scripts/        CLIs run by hand or at bake time, under bare Node. Alongside a route
                 handler, the only place a credential is read — and unlike one, may
                 write files, since no request reaches it.
-public/         Static assets served as-is.
+public/         Static assets served as-is. Also holds submission/, the take-home
+                submission page and the eight exported build transcripts — plain
+                HTML, outside the build graph, reached at /submission via the one
+                rewrite in next.config.ts. Nothing under src/ imports it.
 .claude/        The spec-driven loop: prompts, bibles, skills, and this file.
 plans/          Plan directories — one per plan, with SPEC, chunks and retro.
 ```
