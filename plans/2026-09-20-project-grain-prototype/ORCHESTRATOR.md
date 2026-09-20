@@ -39,8 +39,8 @@ See `SPEC.md` in this directory.
 | ----- | ----- | ------ | -- | ------- |
 | 01 | Foundation | Merged | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
 | 02 | US1 | Merged | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
-| 03 | US1 | Not started | — | — |
-| 04 | US1 | Not started | — | — |
+| 03 | US1 | In review | — | — |
+| 04 | US1 | In review | — | — |
 | 05 | US1 | Not started | — | — |
 | 06 | US2 | Not started | — | — |
 
@@ -80,6 +80,12 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `pr_merged` | 02 | #2 merged at `000da8d`. Lead re-verified the merged tree, type check last: `pnpm lint` 0, `pnpm test` `Tests 94 passed (94)` / 7 files, `pnpm build` 0, `pnpm typecheck` 0 |
 | 2026-09-20 | `wave_merged` | — | Wave 2 complete. Worktree `.worktrees/02-ingest-core` removed; `git worktree list` clean. Its presence was why the first `pnpm lint` on the merged tree reported 148 errors — all under `.worktrees/`; promoted to `project.md` |
 | 2026-09-20 | `preflight_failed` | 03, 04 | Wave 3 preflight halted on four defects. (a) Chunks 03–06 all still carried wave 2's two gate defects — the fix at `20c9ff9` was applied to chunk 02 only; re-measured, `pnpm test --run` exits 1, `pnpm exec tsc --noEmit` exits 0 but is off-convention. (b) Chunk 04's gate 2 globbed `app/**/*.tsx` and `lib/**/*.ts`, which match 0 files in a `src/`-rooted project. (c) Chunk 04 was written against a "fixture snapshot committed by chunk 02" that does not exist — chunk 02 committed a *transcript*. (d) Rubrics 03–06 were never regenerated against the Convention Map despite the explicit Plan-Specific Constraint; 02 had 6 citations, 03 and 04 had 0. All four fixed; 03 and 04 rubrics regenerated (05 and 06 regenerate before their own waves) |
+
+| 2026-09-20 | `chunk_dispatched` | 04 | Worktree `.worktrees/04-canvas-topology` on `feat/project-grain-prototype--canvas-topology` from `a2b8565`; bootstrapped with `pnpm install`, all four gates verified green before dispatch. No credential needed — its snapshot is replayed offline from chunk 02's transcript |
+| 2026-09-20 | `chunk_dispatched` | 03 | Worktree `.worktrees/03-ai-enrichment` from `cb41f75`, bootstrapped with `pnpm install` and `.env.local` carrying a working `GITHUB_TOKEN` and a workspace-scoped `ANTHROPIC_API_KEY`. Dispatch was held ~40 min on credentials: the first key was org-scoped (400, needs `anthropic-workspace-id`) and the second was invalid (401) |
+| 2026-09-20 | `gates_passed` | 04 | Lead re-ran all four in the worktree, type check last: `pnpm lint` 0, `pnpm test` `Tests 135 passed (135)` / 10 files, `pnpm build` 0, `pnpm typecheck` 0. Snapshot provenance verified — byte-identical to a fresh offline replay except `metadata.analyzedAt`. Lead also drove the running app and looked at Level 1, focus and the empty state directly |
+| 2026-09-20 | `gates_passed` | 03 | Lead re-ran all four in the worktree, type check last: `pnpm lint` 0, `pnpm test` `Tests 135 passed (135)` / 9 files, `pnpm build` 0, `pnpm typecheck` 0. Enrichment coverage derived from the files rather than the report: 100/100, 36/36, 100/100, zero missing `label`/`approach`/`steps` |
+| 2026-09-20 | `review_iteration` | 04 | Iteration 1 **FAIL**, narrow — no architectural defect. Reviewer mutation-tested `derive.ts`/`layout.ts` (7 mutants) and found two survivors: `historyBounds`'s widening loop and `volumeSeries`'s final-bucket clamp both delete with 135/135 still green, because the fixture has no PR outside the window or on a bucket boundary. Lead reproduced both independently. Also: an undisclosed design deviation on page 10 (Home/End and whole-range resize), verified against the `@base-ui/react` primitive source, and a missing statement that designs preceded implementation |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
