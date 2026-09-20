@@ -12,7 +12,9 @@ import type { StepDetail } from '@/lib/view/derive';
  *
  * The entry-point step — where the change reached the package the reader owns — carries a
  * `your package` badge and a heavier border. The badge spells it out, so the amber is a
- * second encoding of something already in the text.
+ * second encoding of something already in the text. The same rule holds inside the file
+ * list: a file the expanded package owns gets a filled marker, a heavier weight and a
+ * spoken suffix, never colour alone.
  *
  * **A step with no files is not a bug.** The snapshot records changed files per pull
  * request, not per commit, so `stepChain` attributes them by package and a chain longer
@@ -56,17 +58,33 @@ export function StepCard({ step, packageName }: StepCardProps) {
         </p>
       ) : (
         <ul className="mt-1.5 space-y-1">
-          {step.files.map((file) => (
-            <li
-              key={file.path}
-              className={cn(
-                'font-mono text-[11px] break-all',
-                file.package === packageName ? 'text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              · {file.path}
-            </li>
-          ))}
+          {step.files.map((file) => {
+            // A file the expanded package owns is what the reader came for, so it is
+            // marked three ways and not one: a filled marker rather than a hollow one, a
+            // heavier weight, and a spoken suffix. The colour change rides along with
+            // those rather than carrying the distinction by itself.
+            const owned = file.package === packageName;
+
+            return (
+              <li
+                key={file.path}
+                className={cn(
+                  'flex items-start gap-1.5 font-mono text-[11px] break-all',
+                  owned ? 'font-medium text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    'mt-[5px] size-1.5 shrink-0 rounded-[2px]',
+                    owned ? 'bg-amber-500' : 'border border-muted-foreground/70 bg-transparent',
+                  )}
+                />
+                <span>{file.path}</span>
+                {owned ? <span className="sr-only">— owned by {packageName}</span> : null}
+              </li>
+            );
+          })}
         </ul>
       )}
 

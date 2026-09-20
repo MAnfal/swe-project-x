@@ -708,6 +708,47 @@ describe('stepChain — how one change was built (T003)', () => {
     expect(order).toEqual(['@xyflow/react', '@xyflow/svelte', 'svelte-examples', null]);
   });
 
+  it('gives the leftover file groups to the earliest steps, not the last ones', () => {
+    // The remainder boundary in `assignGroups`. Not a defensive branch: 13 of the enriched
+    // changes across the committed snapshots have more file groups than steps with a
+    // non-zero remainder, and which steps absorb the extra decides what renders under each
+    // step number. The two changes below are picked because they separate the rules —
+    // #5994 leaves one group over and #5978 leaves two, and with only one left over
+    // several wrong distributions coincide.
+    //
+    // #5994: 4 groups over 3 steps. Leading-first gives 2,1,1; trailing-first gives 1,1,2.
+    const one = stepChain(enriched, changeOf(enrichedView, 5994), '@xyflow/react');
+
+    expect(one.steps.map((step) => step.packages)).toEqual([
+      ['@xyflow/react', '@xyflow/svelte'],
+      ['svelte-examples'],
+      [null],
+    ]);
+    expect(one.steps.map((step) => step.files.length)).toEqual([3, 3, 2]);
+
+    // #5978: 5 groups over 3 steps. Leading-first gives 2,2,1; trailing-first gives 1,2,2.
+    const two = stepChain(enriched, changeOf(enrichedView, 5978), '@xyflow/react');
+
+    expect(two.steps.map((step) => step.packages)).toEqual([
+      ['@xyflow/react', 'playwright'],
+      ['svelte-examples', 'react-examples'],
+      [null],
+    ]);
+    expect(two.steps.map((step) => step.files.length)).toEqual([3, 3, 1]);
+  });
+
+  it('splits the groups evenly when the step count divides them', () => {
+    // The other side of the same arithmetic. #5918 has 6 groups over 2 steps, so the
+    // remainder is zero and every step takes exactly `base` — an off-by-one in the
+    // remainder term cannot hide behind an uneven split here.
+    const chain = stepChain(enriched, changeOf(enrichedView, 5918), '@xyflow/react');
+
+    expect(chain.steps.map((step) => step.packages)).toEqual([
+      ['@xyflow/react', '@xyflow/svelte', 'playwright'],
+      ['react-examples', 'svelte-examples', null],
+    ]);
+  });
+
   it('yields an empty chain rather than throwing when the change has no enrichment', () => {
     const pullRequest = bareView.pullRequests[0];
     const chain = stepChain(snapshot, pullRequest, '@xyflow/react');

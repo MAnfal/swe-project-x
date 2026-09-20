@@ -3,6 +3,11 @@
 Branch `feat/project-grain-prototype--canvas-levels`, base commit
 `0914657489e0fb34adf1c7375a5e3738e0e081df`.
 
+**Iteration 2.** Review iteration 1 failed this chunk on one blocking item — a surviving
+mutant at the remainder boundary in `assignGroups` — plus two non-blocking warnings. All
+three are fixed below; everything the reviewer and the lead confirmed held is unchanged.
+Sections carrying new evidence are marked **[iteration 2]**.
+
 ## What changed
 
 | File | Change | Why |
@@ -21,6 +26,9 @@ Branch `feat/project-grain-prototype--canvas-levels`, base commit
 | `src/components/canvas/empty-package.tsx` | **created** | Level 2 with no changes — distinct from chunk 04's `EmptyWindow`. |
 | `src/components/canvas/grain-workspace.tsx` | edited (+189 / −…) | Holds the expansion state, switches the three levels under one persistent slider, renders the breadcrumb and the replay control, and owns the `←`/`Esc` back-out handler. |
 | `src/components/canvas/topology-canvas.tsx` | edited (+53) | Level 1 gains the `Expand N changes →` affordance on the focused package and the `→` key that fires it, per design page 4. |
+| `src/lib/ai/enrichment-record.test.ts` | **created** *[iteration 2]* | The co-located spec the Convention Map's `src/lib/**/*.ts` row asks for, importing **directly** from the module rather than through `enrichment.ts`'s re-export. 10 specs, every one mutation-verified. Closes review warning 1. |
+| `src/lib/view/derive.test.ts` | edited again *[iteration 2]* | Two specs pinning `assignGroups`' remainder boundary — `gives the leftover file groups to the earliest steps, not the last ones` and `splits the groups evenly when the step count divides them`. Closes the blocking finding. |
+| `src/components/canvas/step-card.tsx` | edited again *[iteration 2]* | A file the expanded package owns is now marked by a filled vs hollow marker, a heavier weight and a spoken suffix — not by colour alone. Closes review warning 2. |
 
 ### Reuse
 
@@ -61,8 +69,52 @@ The red run was captured **before** any of the four new functions existed. Full 
 | `stepChain — how one change was built (T003)` (12 specs) | `TypeError: changeOf is not a function` | pass |
 | `changeOf` (2 specs) | `TypeError: changeOf is not a function`; the negative form `expected [Function] to throw error matching /no change numbered/ but got '(0 , __vite_ssr_import_1__.changeOf) is not a function'` | pass |
 
-Green: `pnpm test` → `Test Files 12 passed (12)` / `Tests 234 passed (234)`, exit 0.
-Baseline was `12 passed (12)` / `202 passed (202)`. Delta **+32 tests, 0 failures**.
+Green: `pnpm test` → `Test Files 13 passed (13)` / `Tests 246 passed (246)`, exit 0.
+Baseline was `12 passed (12)` / `202 passed (202)`. Delta **+44 tests, +1 file, 0 failures**.
+(Iteration 1 ended at 234; iteration 2 adds 2 derivation specs and the 10-spec
+`enrichment-record.test.ts`.)
+
+### [iteration 2] The blocking finding, and the three specs that close it
+
+The lead's mutant was real and my iteration-1 table missed it: I mutation-tested the
+*right-align* branch of `assignGroups` (M11) but never the **remainder boundary** inside
+the other branch. Before fixing it I re-derived the reachability sweep independently rather
+than taking the count on trust — a script walking every enriched change under every touched
+package in all four committed snapshots, counting those where `groups >= steps` with a
+non-zero remainder:
+
+```
+enriched changes with a step chain: 159
+reaching the remainder branch (groups >= steps, extra > 0): 13
+  shadcn-ui-ui-2026-06-22 #11720  groups=3 steps=2 extra=1  sizes=[15,2]
+  shadcn-ui-ui-2026-06-22 #11248  groups=3 steps=2 extra=1  sizes=[4,1]
+  shadcn-ui-ui-2026-06-22 #11582  groups=3 steps=2 extra=1  sizes=[12,1]
+  shadcn-ui-ui-2026-06-22 #11713  groups=3 steps=2 extra=1  sizes=[13,1]
+  xyflow-xyflow-2026-06-22 #5915  groups=4 steps=3 extra=1  sizes=[3,2,2]
+  xyflow-xyflow-2026-06-22 #5871  groups=3 steps=2 extra=1  sizes=[2,1]
+  xyflow-xyflow-2026-06-22 #5938  groups=3 steps=2 extra=1  sizes=[2,1]
+  xyflow-xyflow-2026-06-22 #5962  groups=6 steps=5 extra=1  sizes=[4,1,1,1,1]
+  xyflow-xyflow-2026-06-22 #5974  groups=3 steps=2 extra=1  sizes=[3,1]
+  xyflow-xyflow-2026-06-22 #5976  groups=3 steps=2 extra=1  sizes=[2,1]
+  xyflow-xyflow-2026-06-22 #5978  groups=5 steps=3 extra=2  sizes=[3,3,1]
+  xyflow-xyflow-2026-06-22 #5994  groups=4 steps=3 extra=1  sizes=[3,3,2]
+  xyflow-xyflow-2026-06-22 #5997  groups=3 steps=2 extra=1  sizes=[3,1]
+```
+
+My **13** agrees exactly with the lead's 13, and includes both changes they asked for. (My
+159 vs their 236 is a counting difference, not a disagreement: I dedupe by change, they
+count package×change pairs. The hit set is the same.) So this is production behaviour on 13
+real changes, not a defensive branch.
+
+Two specs now pin it, both asserting **per-step composition** rather than the aggregates
+that let the mutation through:
+
+| Test | What it pins | Why this input |
+| ---- | ------------ | -------------- |
+| `gives the leftover file groups to the earliest steps, not the last ones` | `steps.map(s => s.packages)` and `steps.map(s => s.files.length)` for **#5994** (4 groups / 3 steps, `extra=1`) **and #5978** (5 groups / 3 steps, `extra=2`) | `extra=2` is the one the lead asked for and it earns its place: with `extra=1` the leading-first and "one extra to the middle" rules coincide, and with `extra=2` they separate — leading-first gives `[2,2,1]` groups where trailing-first gives `[1,2,2]` |
+| `splits the groups evenly when the step count divides them` | the zero-remainder side of the same arithmetic, on **#5918** (6 groups / 2 steps, `base=3`) | An off-by-one in the remainder term cannot hide behind an uneven split when there is no remainder |
+
+Both use changes already in the committed enriched snapshot — no new fixture.
 
 ### Mutation evidence
 
@@ -89,7 +141,57 @@ restore verified byte-identical with `diff -q`.
 | M13 — `stepChain`: always build a commit URL, even for an unresolvable SHA | `falls back to the pull request link for a step naming a commit it does not contain` | `1 failed \| 232 passed` |
 | M15 — `entryPoint`: compare `files.length > 0` instead of the package name | three specs including `never marks more than one step as the entry point, for any change in the capture` | `3 failed \| 231 passed` |
 
-**One mutant survived, and it exposed real dead code.** M14 — "mark *every* step whose
+### [iteration 2] Mutants at the remainder boundary
+
+The finding showed I had tested one branch of `assignGroups` and not the other, so the
+whole function was re-mutated rather than just the reported line. Same protocol: restore
+from a `mktemp -d` copy, `diff -q` byte-identical, re-run.
+
+| Mutant | Killed by | Result |
+| ------ | --------- | ------ |
+| **M16** — the lead's, verbatim: `index >= stepCount - extra` (remainder to the trailing steps) | `gives the leftover file groups to the earliest steps, not the last ones` | `1 failed \| 245 passed`, `AssertionError: expected [ [ '@xyflow/react' ], …(2) ] to deeply equal [ [ '@xyflow/react', …(1) ], …(2) ]` |
+| M17 — off-by-one: `index <= extra` | 10 specs, including both new ones | `10 failed` |
+| M18 — drop the remainder entirely (`size = base`, groups silently lost) | `accounts for every changed file exactly once across the chain`, `gives the leftover file groups to the earliest steps…`, 2 more | `4 failed \| 232 passed` |
+| M19 — `Math.ceil` instead of `Math.floor` for `base` | 9 specs | `9 failed` |
+| **M20** — `groups.length <= stepCount` (right-align branch taken on equality too) | **nothing — equivalent, see below** | `246 passed (246)` |
+
+**M20 survived, and it is provably equivalent — not a coverage gap.** At
+`groups.length === stepCount` the two branches compute the same thing: the right-align path
+has `offset = 0`, so group *i* goes to slot *i*; the base path has `base = 1` and
+`extra = 0`, so every slot takes exactly one group and the cursor walks them in order.
+Per the lead's stopping rule I measured it instead of arguing it from the code — both
+branch bodies transcribed and run against every `(groups, steps)` pair in
+`0..40 × 1..40`:
+
+```
+exhaustive (groups 0..40) x (steps 1..40): 1640 pairs, 0 produce different output
+of which groups === stepCount (the mutated boundary): 40 pairs, all identical
+```
+
+Zero distinguishing inputs exist, so no test can kill it. Recorded, not chased.
+
+### [iteration 2] Mutants on `enrichment-record.ts`
+
+The new co-located spec was itself seen failing, six ways:
+
+| Mutant | Killed by | Result |
+| ------ | --------- | ------ |
+| N1 — `enrichmentKey`: drop the null-`mergeCommitSha` fallback | `falls back to the number when GitHub reported no merge commit` (+2 existing) | `3 failed \| 243 passed` |
+| N2 — `fallbackEnrichment`: drop the `MAX_LABEL_CHARS` clip | `clips a title too long to render on a card` | `1 failed \| 245 passed` |
+| N3 — `fallbackEnrichment`: drop the empty-title branch | `names the change by its number when there is no title to use` (+2 existing) | `3 failed \| 243 passed` |
+| N4 — `fallbackEnrichment`: stop trimming the title | `names the change by its number when there is no title to use` (+1) | `2 failed \| 244 passed` |
+| N5 — `isFallbackEnrichment`: always `false` | `recognises the record this module itself builds`, `recognises the degraded record the real bake wrote` (+6 in chunk 03's spec) | `8 failed` |
+| N6 — `FALLBACK_APPROACH`: one character changed, drifting from the bake | `recognises the degraded record the real bake wrote` (+2, incl. `baked-snapshots.test.ts`) | `3 failed \| 243 passed` |
+
+N6 is the one that matters for the extraction: it shows the constant is still pinned
+against **what the real bake actually wrote**, so the relocation cannot silently drift from
+the committed snapshots. `hands back this module's bindings rather than a second copy`
+covers the other half — if `enrichment.ts` ever redefines a symbol instead of re-exporting
+it, that spec fails.
+
+---
+
+**One mutant survived in iteration 1, and it exposed real dead code.** M14 — "mark *every* step whose
 files the package owns, not just the first" — left `234 passed (234)`. The tie-break
 `entryStep === null && …` could never fire, because a package's files form exactly one
 group and a group is assigned to exactly one step. Rather than leave an unpinned branch I
@@ -119,16 +221,18 @@ on the base commit **before any edit**: `pnpm lint` exit 0 with **no output** (0
 `pnpm build` exit 0; `pnpm typecheck` exit 0 with no output. Every result below is the
 delta against that, and the delta is **0 new errors and 0 new warnings**.
 
-All four standard gates were re-run **after the last edit**, in order, type check last.
+All four standard gates were re-run **after the last edit of iteration 2**, in order, type
+check last: `pnpm lint` exit 0 no output · `pnpm test` `13 passed (13)` / `246 passed (246)`
+exit 0 · `pnpm build` exit 0, `/` still `○ (Static)` · `pnpm typecheck` exit 0 no output.
 
 | Gate | Command | Result | Fails on base? |
 | ---- | ------- | ------ | -------------- |
 | Lint | `pnpm lint` | exit **0**, no output. Delta vs baseline: 0 errors, 0 warnings. | n/a — a regression gate; it passes on base by design. It *did* fire on this chunk mid-flight: two `react-hooks/set-state-in-effect` **errors** in `onboarding-tour.tsx` (`Avoid calling setState() directly within an effect`), fixed by moving to `useSyncExternalStore` — see Judgment calls. |
-| Tests | `pnpm test` | `Test Files 12 passed (12)` / `Tests 234 passed (234)`, exit **0** | n/a — a regression gate. The 32 new specs were all observed red first (see Tests). |
+| Tests | `pnpm test` | `Test Files 13 passed (13)` / `Tests 246 passed (246)`, exit **0** | n/a — a regression gate. The 44 new specs were observed failing first — by the red run for iteration 1's 32, and by the mutation runs above for iteration 2's 12. |
 | Build | `pnpm build` | exit **0**, `✓ Compiled successfully`, `Finished TypeScript`, `○ (Static) prerendered as static content` for `/` | n/a — a regression gate. |
 | Type check | `pnpm typecheck` | exit **0**, no output. Run **last**. | n/a — a regression gate. |
 | Gate 2 — the change card renders the approach note | see block below | `gate 2 PASS — corpus 20 files, card_src=src/components/canvas/change-card.tsx, approach hits=4`, exit 0 | **yes.** Against the base commit (read with `git ls-tree` / `git show`, mutating nothing): `FAIL: no change card component found (corpus was 13 files)`, exit **1**. |
-| Gate 3 — the test runner really executed tests | `out=$(pnpm test 2>&1); echo "$out" \| grep -Eq '[1-9][0-9]* (passed\|passing)'` | `gate 3 PASS — runner reported: Tests  234 passed (234)`, exit 0 | **No, and it cannot** — it is a vacuity guard on the runner, not a content gate, and the base tree already runs 202 tests. Reported as a false pass rather than claimed as a base-tree falsification. Its negative control is below and it does fire. |
+| Gate 3 — the test runner really executed tests | `out=$(pnpm test 2>&1); echo "$out" \| grep -Eq '[1-9][0-9]* (passed\|passing)'` | `gate 3 PASS — runner reported: Tests  246 passed (246)`, exit 0 | **No, and it cannot** — it is a vacuity guard on the runner, not a content gate, and the base tree already runs 202 tests. Reported as a false pass rather than claimed as a base-tree falsification. Its negative control is below and it does fire. |
 
 Gate 2 as run (the plan's version, with the corpus count surfaced in the failure message):
 
@@ -155,7 +259,11 @@ copy** (never `git checkout --`), and the gate observed clean again — the four
 | Gate 2 #1 — corpus non-empty | covered by #2's message (`corpus was 13 files` on base) | — | — |
 | Gate 2 #2 — a change card exists | `change-card.tsx` moved aside and un-staged | `FAIL: no change card component found (corpus was 19 files)`, exit 1 | `diff -q` byte-identical; gate re-reported `PASS … approach hits=4`, exit 0 |
 | Gate 2 #3 — it renders `approach` | every `approach` renamed to `APPROACH_REMOVED_BY_CANARY` (`grep -c '\bapproach\b'` → **0**) | `FAIL: the change card does not render the approach note`, exit 1 | `diff -q` byte-identical; gate re-reported `PASS … approach hits=4`, exit 0 |
-| Gate 3 — the runner executed tests | `vitest.config.mts` include changed to `src/**/*.no-such-spec.{ts,tsx}` | `No test files found, exiting with code 1` → `FAIL: test runner reported no executed tests`, exit 1 | `diff -q` byte-identical; gate re-reported `PASS — Tests 234 passed (234)`, exit 0 |
+| Gate 3 — the runner executed tests | `vitest.config.mts` include changed to `src/**/*.no-such-spec.{ts,tsx}` | `No test files found, exiting with code 1` → `FAIL: test runner reported no executed tests`, exit 1 | `diff -q` byte-identical; gate re-reported `PASS — Tests 246 passed (246)`, exit 0 |
+
+All three controls above were **re-run against the iteration-2 tree**, not carried over from
+iteration 1 — the figures are from that run, and gate 2 still reports
+`corpus 20 files … approach hits=4` on the restored tree.
 
 ### Runtime evidence
 
@@ -217,6 +325,22 @@ than asserted:
   with a server snapshot of "already dismissed" resolves both: the prerender carries no
   dialog, the client decides after hydration. Replay is derived from the prop during
   render, React's own pattern for state adjusted from props.
+- **[iteration 2] A file the expanded package owns is marked three ways, not by colour.**
+  Review warning 2 was right: `step-card.tsx` distinguished an owned file from any other by
+  `text-foreground` vs `text-muted-foreground` and nothing else — the one place in the chunk
+  where a state distinction had no non-colour carrier. It now pairs that with a **filled**
+  marker where an unowned file gets a **hollow outlined** one, `font-medium` against normal
+  weight, and an `sr-only` suffix "— owned by `<pkg>`" so the distinction is spoken as well
+  as drawn. Colour now rides along with three other carriers, matching how the fallback
+  badge, the direct/indirect badge and the entry-point badge already worked.
+- **[iteration 2] `enrichment-record.ts` got a real co-located spec, not a documented
+  exception.** Review warning 1 offered either. A spec is the better answer: the Convention
+  Map asks for one on every `src/lib/**` module, and reaching the module only through
+  `enrichment.ts`'s re-export cannot tell the two surfaces apart — which is precisely the
+  failure mode a relocation introduces. `enrichment-record.test.ts` imports **directly**
+  from the module and adds one spec that pins the re-export identity itself. Every pull
+  request in it is a real captured one (the bible's rule), and six mutants confirm it can
+  fail. No `project.md` delta is needed for this any more.
 - **`stepChain` returns an empty chain for a degraded record**, not the degraded record's
   synthetic single step. That step's `commitSha` is the enrichment key, which is not a
   commit the pull request contains, and its summary says only that enrichment failed. The
@@ -323,6 +447,12 @@ defers it to the lead.
    the effect form; exit 0 with no output after the change. Rule id printed by ESLint:
    `react-hooks/set-state-in-effect`.
 
+**Not a delta:** review warning 1 offered, as an alternative to writing the spec, recording
+in `project.md` that a re-exported extraction may inherit its origin module's spec. I did
+not take it — `src/lib/ai/enrichment-record.test.ts` now exists and imports the module
+directly, so the Convention Map's `src/lib/**/*.ts` row is satisfied as written and needs no
+exception. Nothing to apply.
+
 No new dependency, no new command, no new file kind, no moved directory. `pnpm build`
 regenerated `src/lib/view/catalog.generated.ts` via `prebuild` and it came back **identical**
 — `git status --short` shows no change to it.
@@ -348,6 +478,15 @@ regenerated `src/lib/view/catalog.generated.ts` via `prebuild` and it came back 
 - **The help menu on design page 9 (`Replay tour`, `Keyboard shortcuts`, `How Grain reads a
   PR`) ships as a single `Replay tour` button.** The other two rows have no content behind
   them in this plan; a menu with one live item and two dead ones is worse than a button.
+- **[iteration 2] M20 (`groups.length <= stepCount`) is left unpinned, deliberately.** It is
+  an equivalent mutant, proven over all 1640 `(groups, steps)` pairs in `0..40 × 1..40`
+  rather than argued from the code — no input distinguishes the two branches at equality, so
+  no test can kill it. Chasing it would mean asserting an implementation detail that has no
+  observable behaviour. Recorded under the lead's stopping rule rather than fixed.
+- **[iteration 2] Chunk 03's `enrichment.test.ts` still builds synthetic pull requests**
+  (`function pullRequest(overrides)`), where the bible asks for the producer's real captured
+  output. The new `enrichment-record.test.ts` uses real captured pull requests throughout,
+  but rewriting chunk 03's spec is outside this chunk. Reported for the next plan.
 - **`change-card.tsx` and `steps-level.tsx` both format a merge date** with their own
   `Intl.DateTimeFormat`, as `empty-window.tsx` and `time-slider.tsx` already do. Four copies
   of a two-line formatter is now enough to justify a shared helper, but extracting one
