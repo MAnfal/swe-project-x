@@ -1,0 +1,1012 @@
+# Chunk 04 — Completion Report
+
+Branch `feat/project-grain-prototype--canvas-topology`, worktree
+`/Users/anfal/Projects/hobby_projects/swe-take-home/.worktrees/04-canvas-topology`,
+base `a2b8565`. Commits: `de50039` (derivation, layout, catalog), `5f27970` (components),
+`512c5ed` (this report), plus the review-iteration-1 fixes.
+
+**The mid-fi designs were supplied before any implementation began.** They landed in
+`887056f` ("plan: fold mid-fi designs into Project Grain plan", 2026-09-20 02:26 -0700) and
+this chunk's first commit is `de50039` (2026-09-20 08:48 -0700); `git merge-base
+--is-ancestor 887056f de50039` exits 0, so the design commit is an ancestor of every commit
+here. Pages 1, 4, 7, 10 and 11 were opened and read before the corresponding presentation
+component was written, and every deviation from them is listed in § Deviations.
+
+## Wave-boundary integration — chunk 03's merge
+
+Iteration 3 passed with no blocking issues. What follows is **integration resolution at the
+wave boundary, not scope I took on**: the lead merged `feat/plan--project-grain-prototype`
+into this branch (chunk 03 landed as PR #3, bringing three baked snapshots) and asked me to
+resolve the resulting three failures. Both changes below were made on the lead's explicit
+instruction, and one of them edits a file chunk 03 owns and that has already been reviewed.
+
+Merge commit on this branch: `ca621a5`. Failures reproduced before touching anything:
+
+```
+ × lists every snapshot committed to the directory, and nothing else
+ × xyflow-xyflow-2026-08-31.json carries enrichment for every pull request
+ × xyflow-xyflow-2026-08-31.json is mostly real model output, not a directory of fallbacks
+      Tests  3 failed | 196 passed (199)
+```
+
+### 1. The stale index — mine, and the test doing its job
+
+`src/lib/view/catalog.generated.ts` listed one snapshot; the directory now holds four.
+`node scripts/build-snapshot-index.mts` regenerated it (`wrote 4 snapshots`). This is
+exactly the drift `catalog.test.ts > lists every snapshot committed to the directory` was
+written to catch, and it caught it at the first opportunity.
+
+### 2. The shared-directory invariant — chunk 03's spec, changed on instruction
+
+`src/lib/ai/baked-snapshots.test.ts` reads every file under `src/lib/snapshots/` and
+asserted that each one carries enrichment for every pull request. That was true of
+everything chunk 03 baked; my un-enriched view fixture lives in the same directory by
+design, so the invariant became false the moment the two merged. Neither chunk was wrong —
+the shared directory was.
+
+**What I changed: the discriminator, and nothing else.** Not a whitelist of curated
+filenames — that rots, and it would stop catching a future bake that silently enriched
+nothing. The invariant is now the one that is actually true of the directory:
+
+- **No `enrichment` key at all** → an un-enriched view fixture. Assert the shape (pull
+  requests and packages present; schema validity is already enforced by the
+  `snapshotSchema.parse` in the collection helper) and assert nothing about enrichment.
+- **An `enrichment` key present** → it must be complete: every pull request enriched, with
+  a non-empty label, approach and steps. **Partial enrichment is the real defect** and this
+  now catches it on *any* snapshot, including one for a repository nobody has curated yet.
+- **Each curated repository must have at least one fully enriched committed snapshot.**
+  Matched by filename prefix, so it survives a re-bake at a different window and tolerates a
+  repository that also carries an un-enriched fixture. Chunk 03's existing "are present for
+  the curated repositories" assertion is untouched; this one is added beside it and reuses
+  the prefixes, which are now named once in `CURATED_REPOSITORIES`.
+
+The `is mostly real model output` test returns early when there is no `enrichment` key — a
+fallback ratio over zero claimed entries grades nothing.
+
+Everything else in that file — the commit-SHA check, the credential check, the presence
+check, the collection helper — is unchanged.
+
+**This is a stronger test than the one it replaces, and here is the proof.** Three canaries,
+each applied to a real committed snapshot, each restored with `cp` from a copied backup:
+
+```
+######## CANARY 1 — a curated bake produced no enrichment at all
+   (enrichment key deleted from xyflow-xyflow-2026-06-22.json)
+pnpm test -> exit 1
+ FAIL  … > xyflow-xyflow- has at least one fully enriched committed snapshot
+AssertionError: xyflow-xyflow-: no committed snapshot carries complete enrichment: expected 0 to be greater than 0
+      Tests  1 failed | 201 passed (202)
+
+######## CANARY 2 — PARTIAL enrichment: one entry dropped from a curated snapshot
+   (dropped enrichment key 005e5ee2a7379b94f0d90248740dcbba80aaa650)
+pnpm test -> exit 1
+ FAIL  … > xyflow-xyflow-2026-06-22.json is either fully enriched or has no enrichment at all
+AssertionError: pull request #5972 has no enrichment: expected undefined to be defined
+ FAIL  … > xyflow-xyflow- has at least one fully enriched committed snapshot
+      Tests  2 failed | 200 passed (202)
+
+######## CANARY 3 — the un-enriched fixture starts CLAIMING enrichment but carries none
+   (enrichment: {} added to xyflow-xyflow-2026-08-31.json)
+pnpm test -> exit 1
+ FAIL  … > xyflow-xyflow-2026-08-31.json is either fully enriched or has no enrichment at all
+AssertionError: pull request #5992 has no enrichment: expected undefined to be defined
+ FAIL  … > xyflow-xyflow-2026-08-31.json is mostly real model output, not a directory of fallbacks
+ FAIL  src/lib/view/catalog.test.ts > … > reports a snapshot the enrichment pass has not run over as un-enriched
+      Tests  4 failed | 202 total
+
+######## after restore
+curated snapshot restored byte-for-byte
+my snapshot restored byte-for-byte
+pnpm test -> exit 0
+      Tests  202 passed (202)
+```
+
+Canary 1 is the one that shows the two assertions are not redundant: with the enrichment key
+gone the *per-file* test correctly stays green — having no enrichment is legitimate — and
+only the curated test fires. Canary 3 is the one that shows the un-enriched branch is a
+discriminator rather than a blanket skip: the moment a fixture claims enrichment it is held
+to the same standard as any other snapshot. Canary 2 is the real defect the reframing was
+for. `git status --porcelain` was clean of snapshot changes afterwards.
+
+### The end state, rendered
+
+Built the merged tree, served it, and opened the picker. All four snapshots are listed,
+discovered from the directory, with mine correctly marked un-enriched:
+
+```json
+["shadcn-ui/ui  5 packages · 100 pull requests",
+ "trpc/trpc    40 packages ·  36 pull requests",
+ "xyflow/xyflow 10 packages · 100 pull requests",
+ "xyflow/xyflow 10 packages ·   6 pull requests · not enriched"]
+```
+
+That is the state the plan predicted: four snapshots, one of them un-enriched, rendered by
+a canvas that never branches on provenance.
+
+## Review iteration 2 — what changed in response
+
+Verdict FAIL on three further survivors, all in the two functions iteration 1 had just
+touched. Iteration 1's fix killed the two mutants it was given and left the surrounding
+guarantee unpinned — the predictable shape of fixing against a named list. This pass closes
+the whole neighbourhood of both functions: both comparison operators in the widening loop,
+and the span floor.
+
+| Issue | Fix | Evidence |
+| ----- | --- | -------- |
+| `derive.ts:82` `merged < from` → `<=` survived | `keeps the declared lower bound when the oldest merge sits exactly on it` | § Mutation kills, mutant D |
+| `derive.ts:86` `merged > to` → `>=` survived | `keeps the declared upper bound when the newest merge sits exactly on it` | § Mutation kills, mutant E |
+| `derive.ts:108` `Math.max(end - start, 1)` → `end - start` survived | three cases under `volumeSeries — a history with no width` | § Mutation kills, mutant F |
+| Guards presented as load-bearing when the ingester cannot reach them | Reachability disclosed in `derive.ts`'s doc comments and below | § Reachability of the two guards |
+| Design page 10's `⇕ resize` | Deferred by lead decision; not an implementation gap | § Deviations, "Design page 10" |
+
+**`derive.ts`'s executable code is unchanged.** The only edit is to two doc comments.
+Verified two ways: the diff contains no non-comment line, and stripping comments and blank
+lines from both revisions gives byte-identical files at 175 lines each.
+
+```
+$ git diff -U0 src/lib/view/derive.ts | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' \
+    | grep -vE '^[+-][[:space:]]*(\*|/\*\*|\*/)'
+(no output)
+$ diff <(strip f4715d5:src/lib/view/derive.ts) <(strip src/lib/view/derive.ts)
+IDENTICAL — derive.ts's executable code is unchanged
+--- line counts:      175 vs      175
+```
+
+### Reachability of the two guards — checked against the producer, not assumed
+
+The reviewer's warning is correct, and re-derived here rather than taken on trust:
+
+- `fetchMergedPullRequests` (`src/lib/ingest/github.ts`) contains
+  `if (pr.merged_at < bounds.since || pr.merged_at >= bounds.until) continue;`, so every
+  pull request written into a snapshot satisfies `since <= merged_at < until`.
+- `ingestRepository` (`src/lib/ingest/ingest.ts`) copies those same bounds into
+  `metadata.window`, and — stronger than the review stated — **rejects a non-positive
+  window before it starts**: `if (!(options.since < options.until)) throw new Error('the
+  window … is empty — since must be before until')`.
+
+So on this repository's own ingester output the widening loop can never fire and the span
+can never be zero. **But the schema admits both**, and Principle 5 says the view renders
+whatever `snapshotSchema` validates, whatever produced it. Measured directly:
+
+```
+zero-width window parses: true
+inverted window parses:   true
+```
+
+That splits the three guards honestly, and the split is now written into `derive.ts`:
+
+- **The widening loop is defensive only.** Nothing this repository produces enters it.
+  Disclosed in `historyBounds`'s doc comment, in the same terms `layoutGraph`'s known-node
+  guard already uses.
+- **The span floor is genuinely reachable at the schema boundary.** A zero-width window
+  parses clean, and without the floor `offset / span` is `0 / 0` → `NaN` → `counts[NaN]`,
+  which writes a string property instead of an array slot: the merge is **silently
+  dropped**, no error, no `NaN` in the output, just a bar that isn't there. Mutant F's kill
+  is exactly that — `expected +0 to be 1`.
+
+A guard being defensive is fine; presenting it as load-bearing was the defect, and that is
+what changed.
+
+## Review iteration 1 — what changed in response
+
+Verdict was FAIL on three blocking items. All three are addressed; the non-blocking focus +
+empty-window warning is fixed too.
+
+| Issue | Fix | Where the evidence is |
+| ----- | --- | --------------------- |
+| 1a. `historyBounds`'s widening loop survived deletion | Four new cases in `derive.test.ts`, driven by the real snapshot with its *declared window* moved | § Mutation kills, mutant A |
+| 1b. `volumeSeries`'s final-bucket clamp survived deletion | Four new cases in `derive.test.ts` with a merge landing exactly on the history bound | § Mutation kills, mutant B |
+| 2. Design page 10's `Home`/`End` and `⇕ resize` undisclosed | `Home`/`End` **built**; `⇕ resize` **disclosed** with the measurement | § Deviations, "Design page 10" |
+| 3. Report did not state the designs preceded implementation | Stated above, verified independently from git | the paragraph above |
+| Warning: focus persisting into an empty range | `changeRange` clears focus, matching `selectRepository` | § Mutation kills, "Focus and the empty state" |
+| Warning: `layoutGraph`'s known-node guard untested | New case pins it by position, not by returned ids | § Mutation kills, mutant C |
+
+No production behaviour in `derive.ts` or `layout.ts` changed for issue 1 — the
+implementation was already correct and the specs were vacuous, which is what was fixed.
+`derive.ts` and `layout.ts` are byte-identical to the reviewed versions.
+
+## What changed
+
+| File | Change | Why |
+| ---- | ------ | --- |
+| `src/lib/snapshots/xyflow-xyflow-2026-08-31.json` | created | T000. Captured output of the committed ingester, produced by replaying chunk 02's HTTP transcript. Never hand-edited. Every spec in this chunk reads it |
+| `src/lib/view/derive.ts` | created | Pure derivation: active set, per-package direct/indirect counts grouped by the package a change came through, the drawn edges, the change-volume histogram, history bounds, presets, focus neighbourhood, nearest-activity window |
+| `src/lib/view/derive.test.ts` | created | T001–T003 plus the snapshot-without-enrichment case and the determinism case |
+| `src/lib/view/layout.ts` | created | T006. dagre positioning, out of the render path. Converts dagre's centre coordinates to React Flow's top-left positions |
+| `src/lib/view/layout.test.ts` | created | T004 |
+| `src/lib/view/catalog.ts` | created | The committed snapshots, each parsed through `snapshotSchema`, exposed as `listSnapshots()` / `getSnapshot(id)` |
+| `src/lib/view/catalog.generated.ts` | created (generated) | Static `import` per snapshot file. This is what puts the JSON in the bundle — see § Deployment measurement |
+| `src/lib/view/catalog.test.ts` | created | Asserts the generated index equals the directory listing (the staleness guard), and that the entry's fields come from the snapshot rather than a hardcoded row |
+| `src/lib/view/fixture.ts` | created | Test support: reads and schema-parses the committed snapshot |
+| `scripts/build-snapshot-index.mts` | created | Regenerates `catalog.generated.ts` from `src/lib/snapshots/`. Runs as `prebuild` |
+| `package.json` | edited | Added `"prebuild": "node scripts/build-snapshot-index.mts"` |
+| `src/components/canvas/package-node.tsx` | created | T007. The custom React Flow node |
+| `src/components/canvas/topology-canvas.tsx` | created | T008. The one React Flow instance: pan/zoom, controls, minimap, legend, focus |
+| `src/components/canvas/time-slider.tsx` | created | T009. Two handles, date readout, histogram, presets |
+| `src/components/canvas/empty-window.tsx` | created | The empty state (design page 7) |
+| `src/components/canvas/repository-picker.tsx` | created | T010. Rows come from the catalog |
+| `src/components/canvas/grain-workspace.tsx` | created | T011. Client composition holding the selected repository, range and focus |
+| `src/app/page.tsx` | edited | Replaced the create-next-app placeholder; hands the client the committed snapshots |
+| `src/app/layout.tsx` | edited | Title/description, and a body that fills the viewport so the canvas can |
+
+Changed in response to review iteration 1:
+
+| File | Change | Why |
+| ---- | ------ | --- |
+| `src/lib/view/fixture.ts` | edited | Added `snapshotWithDeclaredWindow`, which re-parses the committed snapshot with a different *declared* window. Every pull request stays the real captured object; only the field under test moves. The snapshot file is not edited (Principle 4) |
+| `src/lib/view/derive.test.ts` | edited | Eight new cases pinning the two branches the fixture's own window could never reach: `historyBounds`'s widening, and `volumeSeries`'s final-bucket clamp |
+| `src/lib/view/layout.test.ts` | edited | One new case pinning the known-node guard by **position** rather than by returned ids |
+| `src/components/canvas/time-slider.tsx` | edited | `Home`/`End` jump to the repository's start/end (design page 10); preset matching compares instants rather than strings |
+| `src/components/canvas/grain-workspace.tsx` | edited | `changeRange` clears focus, so the canvas can no longer contradict the empty state's copy |
+
+## Acceptance criteria
+
+| Criterion | Met | Evidence |
+| --------- | --- | -------- |
+| Every app and package appears as a node on a pannable, zoomable canvas | yes | `pnpm build && pnpm start`, page opened in Chrome at 1500×940: the a11y tree lists ten `button` nodes, one per package (`@xyflow/eslint-config`, `@xyflow/react`, `@xyflow/rollup-config`, `@xyflow/svelte`, `@xyflow/system`, `@xyflow/tsconfig`, `astro-examples`, `playwright`, `react-examples`, `svelte-examples`) plus `Zoom In` / `Zoom Out` / `Fit View` and a `Mini Map`. `layoutGraph` covers the node set in `layout.test.ts > returns one positioned node per input node` |
+| Packages with a pull request in range are active, others inactive, distinguished by more than colour | yes | `derive.test.ts > marks every package a pull request reached in the range as active` and `> leaves a package with no pull request in the range inactive`. Non-colour distinction measured on the rendered page: untouched `{opacity: "0.45", borderTopStyle: "dashed"}`, direct and indirect both `{opacity: "1", borderTopStyle: "solid"}` (computed styles read from the live DOM) |
+| An active package node shows direct and indirect counts, naming the package they came through | yes | `derive.test.ts > groups the indirect count by the package the change came through`. Rendered accessible names: `"@xyflow/react — 3 direct, 2 via @xyflow/system"`, `"astro-examples — 3 via @xyflow/react, 2 via @xyflow/svelte, 1 via @xyflow/system"` |
+| Dependency edges are drawn only between touched packages; indirect reach is visually distinct | yes | `derive.test.ts > draws a dependency edge only when both ends are active` and `> draws a reach edge from the touched package into the package it reached`. On the rendered page the edge a11y names separate the two kinds (`"@xyflow/react depends on @xyflow/system"` vs `"3 changes reached astro-examples via @xyflow/react"`); a reach is dashed violet (`strokeDasharray: '6 4'`), a dependency solid grey |
+| A focused package shows its neighbourhood and not the rest | yes | `derive.test.ts > returns the focused package and the active packages adjacent to it`. Verified in the browser: clicking `@xyflow/svelte` leaves four nodes on the canvas (`@xyflow/svelte`, `@xyflow/system`, `svelte-examples`, `astro-examples`) and shows the `Focused on @xyflow/svelte — showing its neighbours only Esc` pill |
+| The slider shows full history, the range as dates, where volume clusters, and 7/30/90/all presets | yes | `derive.test.ts > covers the full history from the first bucket to the last`, `> leaves no gap between one bucket and the next`, `presetRange` block. Rendered: readout `Aug 31 – Sep 2, 2026`, `2 days · 6 changes · 6 packages touched`, histogram bars behind the track, buttons `7d` `30d` `90d` `All time` plus a `Custom` pill, and **two** `slider` roles in the a11y tree |
+| A range with no activity shows an empty state | yes | `derive.test.ts > returns an empty active set for a range nothing landed in`. Rendered: moving the right handle to the history start produced the `Nothing landed in this window` card with `NEAREST ACTIVITY … Jump to that window` and `Or widen: Last 90 days / All time`, header reading `0 changes · 0 of 10 packages touched` |
+| Derivation is deterministic | yes | `derive.test.ts > returns the same active set and the same counts when it runs twice`, `> returns the same series when it runs twice`, `layout.test.ts > returns the same positions for the same input` |
+| The picker lists the snapshots actually present, not a hardcoded list | yes | `catalog.test.ts > lists every snapshot committed to the directory, and nothing else` — proven to fail when they diverge (see § Gates, staleness probe). Gate 2 proves no curated repository name appears in any source file |
+
+## Tests
+
+`pnpm test` reported **94 passed (94)** on the base tree and **149 passed (149)** now — 55
+new assertions across four new spec files: 135 as first reviewed, +9 in review iteration 1
+(mutants A–C), +5 in review iteration 2 (mutants D–F).
+
+| Test | Red run (before implementation) | Green run |
+| ---- | ------------------------------- | --------- |
+| `src/lib/view/derive.test.ts` — the whole file (T001, T002, T003, snapshot-without-enrichment) | `FAIL src/lib/view/derive.test.ts [ src/lib/view/derive.test.ts ]` / `Error: Cannot find package '@/lib/view/derive' imported from …/src/lib/view/derive.test.ts` → `Test Files 2 failed \| 7 passed (9)` | `Test Files 10 passed (10) / Tests 135 passed (135)` |
+| `src/lib/view/layout.test.ts` (T004) | Same import failure first; then after `derive.ts` existed, six of seven cases failed at runtime with `TypeError: default.Graph is not a constructor` at `layoutGraph src/lib/view/layout.ts:43:17` → `Tests 6 failed \| 121 passed (127)` | as above |
+| `derive.test.ts > nearestActivity` (three cases, added for the empty state) | `TypeError: nearestActivity is not a function` at `src/lib/view/derive.test.ts:288:12` → `Tests 3 failed \| 132 passed (135)` | as above |
+| `src/lib/view/catalog.test.ts` (five cases) | `FAIL src/lib/view/catalog.test.ts` / `Error: Cannot find package '@/lib/view/catalog' imported from …/src/lib/view/catalog.test.ts` → `Test Files 1 failed \| 9 passed (10)` | as above |
+
+The fourteen cases added in review iterations 1 and 2 were written against code that was
+**already correct**, so there is no "module missing" red run for them. Their red run is the
+mutant:
+each was verified by re-applying the mutation it exists to catch and watching it fail by
+name. That evidence is in § Mutation kills below — it is the only thing that proves those
+tests can fail.
+
+The layout red run is worth keeping: it is not a "module missing" failure but a real
+measurement — see § Deviations.
+
+## Gates
+
+Baseline captured on the base tree (`a2b8565`) in this worktree before any edit, at
+`/private/tmp/claude-501/-Users-anfal-Projects-hobby-projects-swe-take-home/71fa1585-6824-49ad-8941-37a0ae5c8eb4/scratchpad/baseline/`:
+`pnpm lint` exit 0 with **no output**, `pnpm test` **94 passed (94)** in 7 files,
+`pnpm typecheck` exit 0 with no output, `pnpm build` exit 0. **Zero pre-existing errors and
+zero warnings**, so every result below is also the delta.
+
+All four standard gates were re-run **after the last edit**, in order, type check last, on
+the **merged** tree (`ca621a5` plus the integration fixes) — the tree that will actually
+land. The suite is 202 there because chunk 03's specs merged in alongside; chunk 04's own
+contribution is 149 of them.
+
+| Gate | Command | Result | Fails on base? |
+| ---- | ------- | ------ | -------------- |
+| Lint | `pnpm lint` | exit 0, no output | No — base is clean too. `pnpm exec eslint --max-warnings 0` also exits 0 with no output, so "lint passed" here does mean "lint had nothing to say" |
+| Unit tests | `pnpm test` | exit 0, `Test Files 10 passed (10)` / `Tests 149 passed (149)` | Yes, for this chunk's specs: on base they fail to import (`Cannot find package '@/lib/view/derive'`). The base suite itself passes at 94 |
+| Build | `pnpm build` | exit 0, `✓ Compiled successfully`, `Finished TypeScript in 2.1s`, `Route (app) ┌ ○ /` — statically prerendered | No — base builds clean. Falsified by canary instead (below) |
+| Type check | `pnpm typecheck` | exit 0, no output | No — base is clean. Falsified by canary instead (below) |
+| Gate 2 — no curated repository name in source | see script below | exit 0, `gate 2: scanning 38 source files` / `gate 2: PASS` | **No, and it cannot.** See the honest note below |
+| Gate 3 — inactive is not colour alone | see script below | exit 0, `gate 3: PASS — the states differ by non-colour properties, not hue alone` with `inactive: 76: 'border-dashed border-muted-foreground/50 bg-transparent opacity-45'` and `active: 77: : 'border-solid bg-card shadow-sm'` | **Yes**, exit 1: `FAIL: src/components/canvas/package-node.tsx is missing — the gate has nothing to check` |
+
+Final run, after the last edit, on the merged tree:
+
+```
+### pnpm lint      -> exit 0   (pnpm exec eslint --max-warnings 0 -> exit 0)
+### pnpm test      -> exit 0   Test Files  12 passed (12) / Tests  202 passed (202)   [merged tree]
+### pnpm build     -> exit 0   Route (app) ┌ ○ /   ○  (Static)  prerendered as static content
+### pnpm typecheck -> exit 0
+### gate 2         -> exit 0   gate 2: scanning 41 source files / PASS
+### gate 3         -> exit 0   gate 3: PASS — the states differ by non-colour properties, not hue alone
+```
+
+### Gate 2 cannot fail on the base tree — reporting it rather than claiming a pass
+
+Gate 2 is a content gate proving **absence**. On the base tree there is no repository
+picker at all, so it passes vacuously:
+
+```
+$ GATE_ROOT=<base tree extracted from a2b8565> bash gate2.sh
+gate 2: scanning 24 source files
+gate 2: PASS — no curated repository name appears in source
+gate2_on_base_exit=0
+```
+
+Per `gates.md`, a gate proving content was *removed* is falsified by planting the needle,
+not by the base tree. Three probes were run, one per needle, each planted in
+`src/components/canvas/repository-picker.tsx`:
+
+```
+--- probe: xyflow/xyflow ---
+FAIL: "xyflow/xyflow" is hardcoded in source:
+src/components/canvas/repository-picker.tsx:55:const CANARY = ["xyflow/xyflow"];
+  => gate exited 1 for xyflow/xyflow
+--- probe: shadcn-ui/ui ---
+FAIL: "shadcn-ui/ui" is hardcoded in source:
+src/components/canvas/repository-picker.tsx:55:const CANARY = ["shadcn-ui/ui"];
+  => gate exited 1 for shadcn-ui/ui
+--- probe: trpc/trpc ---
+FAIL: "trpc/trpc" is hardcoded in source:
+src/components/canvas/repository-picker.tsx:55:const CANARY = ["trpc/trpc"];
+  => gate exited 1 for trpc/trpc
+working state restored byte-for-byte
+--- after restore ---
+gate 2: scanning 38 source files
+gate 2: PASS — no curated repository name appears in source
+  => gate returns clean once the canary is removed
+```
+
+Restored by `cp` from a copied backup, never `git checkout --`, and `git status --porcelain`
+was empty afterwards.
+
+**The plan's gate-2 recipe as written is blind to an uncommitted file.** Its corpus is
+`git ls-files 'src/**/*.ts' 'src/**/*.tsx'`, which lists tracked files only. My first probe
+run planted the canary in an as-yet-uncommitted `repository-picker.tsx` and the gate
+reported PASS. The gate I ran unions tracked with
+`git ls-files --others --exclude-standard`, which is what `gates.md` § "An empty corpus"
+prescribes, and which raised the corpus from 24 to 38 files:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+cd "${GATE_ROOT:-<worktree>}"
+corpus=$( { git ls-files 'src/**/*.ts' 'src/**/*.tsx'; \
+            git ls-files --others --exclude-standard 'src/**/*.ts' 'src/**/*.tsx'; } | sort -u )
+count=$(printf '%s\n' "$corpus" | grep -c . || true)
+[ "$count" -ge 1 ] || { echo "FAIL: empty corpus — this gate would pass vacuously" >&2; exit 1; }
+echo "gate 2: scanning $count source files"
+g2_fail=0
+for g2_needle in 'xyflow/xyflow' 'shadcn-ui/ui' 'trpc/trpc'; do
+  g2_hits=$(printf '%s\n' "$corpus" | xargs grep -nE "\"$g2_needle\"" 2>/dev/null \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*)' || true)
+  if [ -n "$g2_hits" ]; then
+    echo "FAIL: \"$g2_needle\" is hardcoded in source:" >&2; printf '%s\n' "$g2_hits" >&2; g2_fail=1
+  fi
+done
+[ "$g2_fail" -eq 0 ] || exit 1
+echo "gate 2: PASS — no curated repository name appears in source"
+```
+
+Each needle is checked separately rather than as one `grep -E 'a|b|c'`, so a hit names which
+one matched.
+
+### Gate 3 — completed against the component this chunk wrote
+
+The plan left gate 3 to be written against the real component. The claim under test is that
+active and inactive differ in a **non-colour** property, so it is asserted on both sides:
+the inactive class literal must carry `opacity-<n>` **and** `border-dashed`, and the active
+one must carry `border-solid`. Only class-list string literals are searched and comment
+lines are excluded — the comment above that branch says "a dashed border and reduced
+opacity" in prose, and a bare-word grep would make rewording the comment a way to satisfy
+the gate.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+cd "${GATE_ROOT:-<worktree>}"
+FILE=src/components/canvas/package-node.tsx
+[ -f "$FILE" ] || { echo "FAIL: $FILE is missing — the gate has nothing to check" >&2; exit 1; }
+# A class literal alone on its line, optionally preceded by a ternary arm's ? or :.
+literals=$(grep -nE "^[[:space:]]*([?:][[:space:]]*)?'[^']*',?$" "$FILE" \
+           | grep -vE ':[0-9]+:[[:space:]]*(//|\*)' || true)
+[ -n "$literals" ] || { echo "FAIL: no class-list literal found in $FILE" >&2; exit 1; }
+inactive=$(printf '%s\n' "$literals" | grep -E "opacity-[0-9]+" | grep -E "border-dashed" || true)
+active=$(printf '%s\n' "$literals" | grep -E "border-solid" || true)
+fail=0
+printf '%s\n' "$inactive" | grep -qE "border-dashed"   || { echo "FAIL: no inactive class literal sets a dashed border" >&2; fail=1; }
+printf '%s\n' "$inactive" | grep -qE "opacity-[0-9]+"  || { echo "FAIL: no inactive class literal reduces opacity" >&2; fail=1; }
+printf '%s\n' "$active"   | grep -qE "border-solid"    || { echo "FAIL: the active treatment does not set border-solid, so the border style does not distinguish the states" >&2; fail=1; }
+[ "$fail" -eq 0 ] || exit 1
+echo "gate 3: PASS — the states differ by non-colour properties, not hue alone"
+printf '  inactive: %s\n' "$inactive"; printf '  active:   %s\n' "$active"
+```
+
+Three probes, one per needle, each restored from a copied backup:
+
+```
+--- probe: inactive loses opacity (colour + dashes remain) ---
+FAIL: no inactive class literal sets a dashed border
+FAIL: no inactive class literal reduces opacity
+  => gate exited 1
+--- probe: inactive loses the dashed border (colour + opacity remain) ---
+FAIL: no inactive class literal sets a dashed border
+FAIL: no inactive class literal reduces opacity
+  => gate exited 1
+--- probe: active loses border-solid (only hue would separate the states) ---
+FAIL: the active treatment does not set border-solid, so the border style does not distinguish the states
+  => gate exited 1
+working state restored byte-for-byte
+--- after restore ---
+gate 3: PASS — the states differ by non-colour properties, not hue alone
+```
+
+(The first two probes print both inactive messages because `inactive` requires both tokens
+on the same literal — removing either empties the set. That is correct, just chatty.)
+
+The gate reads the source, so it was corroborated against the **rendered** output. Computed
+styles read from the live DOM of the built app:
+
+```json
+{"count":10,
+ "direct":   {"label":"@xyflow/react — 3 direct, 2 via @xyflow/system","opacity":"1","borderTopStyle":"solid"},
+ "indirect": {"label":"astro-examples — 3 via @xyflow/react, 2 via @xyflow/svelte, 1 via @xyflow/system","opacity":"1","borderTopStyle":"solid"},
+ "untouched":{"label":"@xyflow/eslint-config — untouched in this window","opacity":"0.45","borderTopStyle":"dashed"}}
+```
+
+Direct versus indirect does not rest on hue either: both the visible badge and the
+accessible name spell out "3 direct" and "2 via @xyflow/system".
+
+### Build and type-check falsification (canary, since base is clean)
+
+A canary in `src/lib/view/derive.ts` — a module no route imports directly — confirms the
+build really type-checks this chunk's new directory:
+
+```
+pnpm build     -> exit 1
+src/lib/view/derive.ts(280,7): error TS2322: Type 'string' is not assignable to type 'number'.
+pnpm typecheck -> exit 2
+src/lib/view/derive.ts(280,7): error TS2322: Type 'string' is not assignable to type 'number'.
+restored byte-for-byte from the copied backup
+=== after restore ===
+pnpm build     -> exit 0
+pnpm typecheck -> exit 0
+```
+
+### The picker's discovery claim, falsified directly
+
+The acceptance criterion is "lists the snapshots actually present". `catalog.test.ts`
+enforces it, and the probe proves the enforcement is real — a snapshot file dropped into
+the directory without regenerating the index turns the suite red:
+
+```
+=== canary: a snapshot lands in the directory without the index being regenerated ===
+pnpm test -> exit 1
+     × lists every snapshot committed to the directory, and nothing else 6ms
+ FAIL  src/lib/view/catalog.test.ts > the snapshot catalog > lists every snapshot committed to the directory, and nothing else
+AssertionError: expected [ 'xyflow-xyflow-2026-08-31.json' ] to deeply equal [ …(2) ]
+      Tests  1 failed | 134 passed (135)
+=== after removing the probe file ===
+xyflow-xyflow-2026-08-31.json
+pnpm test -> exit 0
+ Test Files  10 passed (10)
+      Tests  135 passed (135)
+```
+
+**This is the mechanism that will catch chunk 03.** When their snapshots land in
+`src/lib/snapshots/`, `pnpm test` goes red until `node scripts/build-snapshot-index.mts` is
+re-run (or `pnpm build`, which runs it). Worth telling them at the merge.
+
+## Mutation kills — review iteration 1
+
+The reviewer found two survivors. I reproduced both on the reviewed tree before changing
+anything, added tests, then re-applied each mutant and recorded the named tests that die.
+Every mutation was restored with `cp` from a copied backup, never `git checkout --`, and
+`git status --porcelain` was empty afterwards.
+
+### Before: both mutants survived
+
+```
+=== MUTANT A (before the fix): delete historyBounds's widening loop ===
+pnpm test -> exit 0
+ Test Files  10 passed (10)
+      Tests  135 passed (135)
+
+=== MUTANT B (before the fix): remove volumeSeries's final-bucket clamp ===
+pnpm test -> exit 0
+ Test Files  10 passed (10)
+      Tests  135 passed (135)
+derive.ts restored byte-for-byte
+```
+
+### Why the fixture alone could not reach either branch
+
+`src/lib/snapshots/xyflow-xyflow-2026-08-31.json` declares
+`window: { since: 2026-08-31T00:00:00Z, until: 2026-09-02T00:00:00Z }`, and all six of its
+merges land strictly inside it (oldest `2026-08-31T09:22:57Z`, newest
+`2026-09-01T12:02:55Z`). So the widening loop never widens, and no merge ever sits at the
+history's upper bound.
+
+Rather than hand-author a snapshot — Principle 4 forbids editing the committed one, and a
+hand-rolled one would exercise only the simple case — `fixture.ts` grew
+`snapshotWithDeclaredWindow`, which re-parses the **real** snapshot through `snapshotSchema`
+with a different declared window. Every pull request stays the producer's real captured
+object; the one field under test moves. Same technique as
+`transcriptWithReversedListing` in `src/lib/ingest/fixtures/replay.ts`, which permutes real
+captured pull requests to expose an ordering the capture happened not to contain.
+
+### Mutant A — `historyBounds`'s widening loop deleted
+
+Mutation: the whole `for (const pullRequest of snapshot.pullRequests)` loop in
+`derive.ts:80-90` replaced with `void from; void to;`.
+
+```
+pnpm test -> exit 1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge outside the declared window (T003) > widens the upper bound to the newest merge when the declared window ends before it
+AssertionError: expected '2026-09-01T00:00:00Z' to be '2026-09-01T12:02:55Z' // Object.is equality
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge outside the declared window (T003) > widens the lower bound to the oldest merge when the declared window starts after it
+AssertionError: expected '2026-08-31T12:00:00Z' to be '2026-08-31T09:22:57Z' // Object.is equality
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge outside the declared window (T003) > leaves a pull request outside the declared window reachable by the full-history range
+AssertionError: expected 2 to be 6 // Object.is equality
+      Tests  3 failed | 140 passed (143)
+```
+
+The third case is the one that matters most: it asserts the *reason* the loop exists — with
+the loop gone, the all-time range reaches 2 of the 6 changes instead of all 6.
+
+### Mutant B — `volumeSeries`'s final-bucket clamp removed
+
+Mutation: `Math.min(bucketCount - 1, Math.max(0, …))` at `derive.ts:114` reduced to
+`Math.max(0, …)`.
+
+```
+pnpm test -> exit 1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/lib/view/derive.test.ts > volumeSeries — a merge landing exactly on the upper bound (T003) > emits exactly the requested number of buckets
+AssertionError: expected [ { …(3) }, { …(3) }, { …(3) }, …(6) ] to have a length of 8 but got 9
+ FAIL  src/lib/view/derive.test.ts > volumeSeries — a merge landing exactly on the upper bound (T003) > counts that merge in the final bucket rather than off the end of the series
+AssertionError: expected NaN to be greater than or equal to 1
+ FAIL  src/lib/view/derive.test.ts > volumeSeries — a merge landing exactly on the upper bound (T003) > still accounts for every pull request exactly once
+AssertionError: expected false to be true // Object.is equality
+      Tests  3 failed | 140 passed (143)
+```
+
+The failure mode is worse than the comment implied and the tests now pin all of it: the
+write lands on `counts[bucketCount]`, which is `undefined`, so `undefined + 1` stores `NaN`
+**and extends the array** — nine buckets instead of eight, with a `NaN` count in the last
+one. A `NaN` bar height would render as no bar at all.
+
+**One branch deliberately left untested:** the *lower* clamp, `Math.max(0, …)`. It is
+unreachable by construction — `volumeSeries` derives `start` from `historyBounds(snapshot)`,
+which is already widened down to the earliest merge, so `offset` cannot be negative for any
+snapshot. It is defensive, and I would rather say that than write a test that cannot
+distinguish anything.
+
+### Mutant C — `layoutGraph`'s known-node guard removed (the reviewer's warning)
+
+The old case only checked returned ids, which are always copied from the input `nodes`
+array and so cannot tell "phantom dropped" from "phantom created". The new case pins it by
+**position**: a phantom *source* takes dagre rank 0 and pushes the real graph a rank right.
+
+Mutation: `if (!known.has(edge.from) || !known.has(edge.to)) continue;` removed.
+
+```
+pnpm test -> exit 1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/lib/view/layout.test.ts > layoutGraph (T004) > does not let a dangling edge shift the nodes that are in the list
+AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+      Tests  1 failed | 143 passed (144)
+layout.ts restored byte-for-byte
+```
+
+### Mutants D and E — the widening loop's comparison operators
+
+Iteration 1's `volumeSeries` test set `until` equal to a pull request's own `mergedAt`, so
+nothing was ever *strictly* greater than `to` and `historyBounds`' tie branch was never
+decided. These two cases decide it: the declared bound and the merge name the **same
+instant in different spellings**, so `<` and `<=` (and `>` and `>=`) produce different
+output and the assertion can tell them apart.
+
+Mutation D: `if (merged < from)` → `if (merged <= from)`.
+
+```
+pnpm test -> exit 1
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge sitting exactly on a declared bound (T003) > keeps the declared lower bound when the oldest merge sits exactly on it
+AssertionError: expected { from: '2026-08-31T09:22:57Z', …(1) } to deeply equal { …(2) }
+      Tests  1 failed | 148 passed (149)
+```
+
+Mutation E: `if (merged > to)` → `if (merged >= to)`.
+
+```
+pnpm test -> exit 1
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge sitting exactly on a declared bound (T003) > keeps the declared upper bound when the newest merge sits exactly on it
+AssertionError: expected { from: '2026-08-31T00:00:00Z', …(1) } to deeply equal { from: '2026-08-31T00:00:00Z', …(1) }
+      Tests  1 failed | 148 passed (149)
+```
+
+The property being pinned is a real one, not a formatting accident: **the declared bound is
+reported verbatim unless a merge falls strictly outside it.** `volumeSeries` anchors its
+first and last bucket edges to those exact strings, so a bound that silently re-spells
+itself from whichever pull request happened to tie would make the series' extent depend on
+the producer's timestamp formatting.
+
+### Mutant F — the span floor
+
+Mutation: `const span = Math.max(end - start, 1);` → `const span = end - start;`.
+
+```
+pnpm test -> exit 1
+ FAIL  src/lib/view/derive.test.ts > volumeSeries — a history with no width (T003) > still counts the merge that sits on that instant
+AssertionError: expected +0 to be 1 // Object.is equality
+      Tests  1 failed | 148 passed (149)
+```
+
+The case is one real pull request (5992) with the declared window set to its own merge
+instant, so `historyBounds` collapses to a point. `0 / 0` is `NaN`, and `counts[NaN] += 1`
+sets a **string property** on the array rather than an element — so the array keeps its
+length, every bucket stays `0`, and the change vanishes with no error and no `NaN` anywhere
+a caller would see it. That is why the assertion is on the total rather than on the shape.
+
+### Focus and the empty state (the reviewer's warning)
+
+`grain-workspace.tsx` now routes both the slider and the empty state through `changeRange`,
+which clears `focused` — the same thing `selectRepository` already did for repository
+switches. Measured on the built app: focus `@xyflow/svelte` (canvas narrows to 4 nodes, one
+`aria-pressed="true"`), then scrub the right handle back past the first merge:
+
+```json
+{"range":["2026-08-31T00:00:00.000Z","2026-08-31T08:00:00.000Z"],
+ "header":"0 changes · 0 of 10 packages touched",
+ "nodesOnCanvas":10, "stillFocused":0, "untouchedOnCanvas":10,
+ "emptyStateHeading":"Nothing landed in this window",
+ "emptyStateCopy":"No pull requests touched any package in xyflow/xyflow between Aug 31 and Aug 31, 2026. All 10 packages are dimmed because none were reached, directly or otherwise."}
+```
+
+Ten nodes on the canvas, all ten untouched, none focused — the picture now matches the
+sentence. (I verified the fixed state in the browser; the broken state is the reviewer's
+reproduction, not re-derived here.)
+
+## Deployment measurement — how the picker discovers snapshots
+
+Measured rather than assumed, as the dispatch asked.
+
+**What I chose: a build-time-generated index of static imports.**
+`scripts/build-snapshot-index.mts` reads `src/lib/snapshots/` and writes
+`src/lib/view/catalog.generated.ts`, one `import … from '../snapshots/<file>.json'` per
+snapshot. It runs as `prebuild`; the generated file is also committed so `pnpm dev` and
+`pnpm test` work without running it, and `catalog.test.ts` fails if the committed copy has
+drifted. Nothing reads the filesystem at request time, at build time, or anywhere outside
+the test runner.
+
+**The measurement.** `pnpm build`, then `pnpm start`, then the page fetched over HTTP:
+
+```
+$ curl -s -o page.html -w '%{http_code}\n' http://localhost:3000/
+200
+$ grep -c 'xyflow/xyflow' page.html
+1
+```
+
+The repository is listed in the served output. Then, tracing where the data actually lives —
+probing for a merge SHA that only exists inside the snapshot:
+
+```
+$ SHA=0a1f9575b25679f2880175de8d3eae21aedde921
+$ grep -rl "$SHA" .next | sort
+.next/server/app/index.html
+.next/server/app/index.rsc
+.next/server/app/index.segments/__PAGE__.segment.rsc
+.next/server/app/index.segments/_full.segment.rsc
+.next/server/chunks/ssr/src_0m27bux._.js
+.next/server/chunks/ssr/src_0m27bux._.js.map
+
+$ find .next -path '*snapshots*' -name '*.json'
+(no output)
+```
+
+The snapshot's **content** is compiled into the server chunk and into the prerendered
+payload; **no copy of `src/lib/snapshots/` exists anywhere in the build output.** That is
+the trap, confirmed: a request-time `readdir('src/lib/snapshots')` has nothing in the built
+artifact to read, and would only appear to work locally because the source tree happens to
+sit next to `.next` under `pnpm dev` and `pnpm start`. I did not deploy to Vercel, so I am
+not claiming a measurement of Vercel's tracer — what I measured is that Next's own build
+output carries the data and not the directory, which is sufficient reason to prefer the
+static-import index.
+
+The route is reported as `○ (Static) prerendered as static content`, so in practice nothing
+runs at request time at all. Keeping the range in component state rather than in a search
+param is part of what preserves that (see § Judgment calls).
+
+## Judgment calls
+
+- **Range in component state, not the URL.** Chosen because the URL is chunk 06's surface —
+  it owns `Other…`, the repository URL input and the back arrow, and a query param added
+  here would be rewritten there — and because keeping the range out of `searchParams` keeps
+  `/` statically prerenderable, which is what makes the deployment measurement above hold.
+  **The cost: a scrubbed view cannot be shared as a link.** If that matters, it is a small
+  change (`useSearchParams` + `router.replace`) and it should be made in chunk 06, together
+  with the repository parameter, so there is one URL contract rather than two.
+
+- **Histogram, not a sparkline.** The designs (page 10) say "Histogram — merged changes per
+  bucket across the repo's whole life. Bars inside the range are lit; outside they stay
+  muted." A sparkline implies a continuous quantity; merges are discrete events in a bucket,
+  and lighting individual bars is what makes the selected range legible against the whole
+  history. **When one window dominates:** bar heights are on a **square-root** scale, not
+  linear. On a linear scale one release week with ten times the merges of a quiet week
+  renders full-height while every other bar rounds to nothing, and the histogram stops
+  showing where change clusters and shows only where it peaked. The square root keeps the
+  tall bar tallest while leaving quiet weeks legible, and a non-empty bucket never renders
+  shorter than 8% of the track height — so "some activity" is never visually identical to
+  "none". Empty buckets render as a 2% sliver, which is why a quiet stretch reads as quiet
+  rather than as missing data. Default resolution is 64 buckets across the whole history.
+
+- **Focus on click, not hover.** Hover-to-focus fights panning: the pointer crosses nodes on
+  its way anywhere, and the graph would reshape under the cursor mid-drag. Click is also
+  what makes the interaction reachable from the keyboard here — **the node body is a real
+  `<button>`**, so `Tab` reaches it and `Enter`/`Space` fire the same handler natively, with
+  `aria-pressed` reflecting the toggle. React Flow's own node focus ring is switched off
+  (`nodesFocusable={false}`) so the tab order has one stop per node instead of two.
+  `Escape` clears focus, as the focus pill says, via a `keydown` listener mounted only while
+  focus is active. Verified in the browser: the a11y tree lists ten buttons with names like
+  `"@xyflow/react — 3 direct, 2 via @xyflow/system"`.
+
+- **What the installed shadcn slider supports for two handles: everything needed, no new
+  dependency.** Measured against the committed `src/components/ui/slider.tsx` and
+  `@base-ui/react@1.8.0`. The shadcn wrapper already computes
+  `_values = Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]`
+  and renders `Array.from({length: _values.length}, … <SliderPrimitive.Thumb/>)` — one thumb
+  per value, defaulting to **two**. `SliderRoot` is generic over
+  `Value extends number | readonly number[]`, and also offers `minStepsBetweenValues`,
+  `largeStep` and `thumbCollisionBehavior: 'push' | 'swap' | 'none'`. I pass
+  `value={[from, to]}` with `minStepsBetweenValues={1}`. Confirmed at runtime: the rendered
+  a11y tree contains two `slider` roles and two `input[type=range]` elements sharing one
+  min/max. **No new dependency was added.**
+
+- **Presets anchor to the end of the snapshot's history, not to `Date.now()`.** A snapshot is
+  a recording; "the last 7 days" of a recording means the last seven days it contains.
+  Anchoring to the wall clock would make the same snapshot derive differently on different
+  days, which the SPEC's reproducibility metric forbids, and on this two-day capture every
+  rolling preset would be empty. Presets clamp to the history start, so on this snapshot
+  7d/30d/90d/all-time all collapse to the whole capture; the active-preset indicator
+  searches from the widest end so the pill that lights up is the honest one (`All time`).
+
+- **The slider's arrow-key step follows the span.** A day-sized nudge is meaningless on a
+  two-day capture and essential on a three-year one, so the step is one day when the history
+  is ≥ 60 days and one hour otherwise, and the keyboard hint text follows it ("← → nudge an
+  hour" on this snapshot). The designs' hint reads "nudge a day"; see § Deviations.
+
+- **History bounds come from `metadata.window`, widened to contain any pull request outside
+  it.** The declared window is what was asked for and what the snapshot claims to cover; the
+  widening exists so a merge outside it could never be unreachable by any range. Measured on
+  this snapshot: the bounds are exactly the declared window.
+
+- **All snapshots are serialized to the client, not just the selected one.** Four committed
+  snapshots at ~24KB each is fine for a prototype and keeps the page static. It will not
+  scale — see § Left alone.
+
+## Deviations from the plan, and design contradictions
+
+- **`@dagrejs/dagre`'s default export does not carry `Graph`.** The plan and the
+  `dagre.layout(...)` idiom imply `import dagre from '@dagrejs/dagre'`. Measured against the
+  installed 3.1.1: `import * as ns` gives
+  `['Graph','debug','default','graphlib','layout','util','version']` but
+  `Object.keys(ns.default)` is `['graphlib','version','layout','debug','util']` — **no
+  `Graph`**. `new dagre.Graph(...)` throws `TypeError: default.Graph is not a constructor`,
+  which is the layout spec's red run. The measurement wins: `layout.ts` uses named imports
+  (`import { Graph, layout, type EdgeLabel, type GraphLabel, type NodeLabel }`), and the
+  reason is recorded in a comment beside the call.
+
+- **React Flow under server rendering: no explicit dimensions are required, but they are set
+  anyway.** `@xyflow/react@12.11.6` exports `Background`, `Controls`, `MiniMap`,
+  `MarkerType`, `Panel`, `Position`, `Handle`, `NodeProps`, `NodeTypes` and `ReactFlow` from
+  the package root (`Background`/`Controls`/`MiniMap` via `export * from './additional-components'`).
+  Registration is `nodeTypes={{ package: PackageNode }}`, hoisted to module scope so a new
+  object each render does not remount every node. The canvas is a client component, so SSR
+  never measures a node; `width`/`height` are still set on each node from the same values
+  dagre used, because otherwise the first `fitView` runs before measurement and frames the
+  graph wrongly. Verified visually: the graph is framed correctly on first paint.
+
+- **The fixture the plan originally named does not exist — the amendment is correct.** T000
+  ran exactly the command in § Context and produced
+  `xyflow/xyflow 2026-08-31T00:00:00Z..2026-09-02T00:00:00Z: 10 packages, 6 pull requests`,
+  exit 0, a 24,190-byte file with top-level keys `['metadata','packages','pullRequests']`
+  and no `enrichment` — matching the lead's measurement exactly.
+
+- **Design contradiction (page 4/11 vs the plan): edges are not labelled.** My first pass put
+  `N via <package>` on each reach edge. The designs do not label edges at all — the count and
+  the package it came through live on the target node's badge — and with sixteen edges over
+  ten nodes the labels were unreadable. Removed; the information is now on the node badge and
+  in each edge's `aria-label`. **The design wins.**
+
+- **Design contradiction (page 4 vs this chunk's scope): the `Expand N changes →` affordance
+  is not built.** Page 4 shows it beneath the focused node. Expansion is chunk 05's
+  deliverable, so it is deliberately absent. Flagging it so the reviewer does not read the
+  gap as an oversight, and so chunk 05 knows where the designs put it.
+
+- **Design contradiction (page 4 vs page 11): theme.** Page 4 is dark and page 11 is the light
+  theme of the same screen. The app as chunk 01 left it renders light (`:root` is light, and
+  nothing ever adds `.dark`), so what I built matches **page 11** exactly. Every colour is a
+  semantic token or an amber/violet pair with a `dark:` variant, so a theme toggle would light
+  up page 4 without touching this code — but no toggle was added, since none of the designs
+  shows one and the plan does not ask for it.
+
+- **Design page 10's keyboard model: `Home`/`End` built, `⇕ resize` not built.** Missed in
+  the first pass; raised by the reviewer. Page 10's footer hint reads
+  `← → nudge a day · ⇕ resize · Home / End jump to repo start / end`.
+
+  **`Home`/`End` are now implemented**, because the installed primitive gets only half of
+  them right. Measured against `@base-ui/react` 1.8.0,
+  `node_modules/@base-ui/react/slider/thumb/SliderThumb.js:323-328`:
+
+  ```js
+  case _composite.END:
+    newValue = range && Number.isFinite(sliderValues[index + 1]) ? sliderValues[index + 1] - step * minStepsBetweenValues : max;
+    break;
+  case _composite.HOME:
+    newValue = range && Number.isFinite(sliderValues[index - 1]) ? sliderValues[index - 1] + step * minStepsBetweenValues : min;
+    break;
+  ```
+
+  On a two-thumb range that means `Home` on the **left** handle and `End` on the **right**
+  handle fall through to `min`/`max` and behave as the design says — but `End` on the left
+  handle and `Home` on the right handle clamp to just beside the *other thumb* instead.
+  `TimeSlider` now takes both keys in the capture phase, before the thumb sees them, and
+  gives them one meaning whichever handle has focus: **Home moves the range's start to the
+  repository start, End moves its end to the repository end.** That reading is the literal
+  words of the hint, it is a superset of the half the primitive already got right, and it
+  can never invert the range. Verified on the built app — the two cases the primitive gets
+  wrong:
+
+  ```
+  range Aug 31 00:00 → Sep 1 04:00, LEFT handle focused, press End
+    -> ["2026-08-31T00:00:00.000Z", "2026-09-02T00:00:00.000Z"]   (range end jumped to repo end)
+       the primitive alone would have moved `from` to 2026-09-01T03:00Z instead
+
+  range Aug 31 10:00 → Sep 2 00:00, RIGHT handle focused, press Home
+    -> ["2026-08-31T00:00:00.000Z", "2026-09-02T00:00:00.000Z"]   (range start jumped to repo start)
+       the primitive alone would have moved `to` back beside the left thumb instead
+  ```
+
+  The footer hint now reads
+  `← → nudge an hour · Home / End jump to repo start / end · Tab reaches each handle`.
+
+  **`⇕ resize` is not built — deferred by lead decision at review iteration 2.** The
+  reviewer re-opened page 10 and confirmed that none of its four state cards fixes the
+  gesture's anchor or amount, which makes this a gap in the design rather than in the
+  implementation. The lead has taken the decision: do not build it, file it as an idea with
+  its own boundary, and add the Design Decision. This section stands as the record of what
+  was found; the resolution lives with the lead's idea, not here. My original reasoning,
+  which the lead accepted, follows. First, the mid-fi specifies neither the anchor nor the amount — "resize" a
+  range could mean widen/narrow about its centre, about the focused handle, or about the
+  fixed handle, by one step or one large step, and page 10's four state cards (REST,
+  DRAGGING, HANDLE FOCUSED, PRESET APPLIED) do not describe it. Second, `⇕` means the
+  Up/Down arrows, which already carry a meaning here: `SliderThumb.js:303-311` maps
+  `ARROW_UP`/`ARROW_DOWN` to ±`step` on the focused thumb, which is also what the WAI-ARIA
+  slider pattern specifies and what a screen-reader user expects. Redefining them to resize
+  the whole range would make this slider behave unlike every other one. If the intent is a
+  real resize gesture it wants its own decision — and most likely a pointer drag on the lit
+  segment rather than an arrow-key override. Flagged for the plan rather than guessed at.
+
+- **Design element not built: the `main` branch chip and the `Legend` / `?` header buttons**
+  (page 4, top right). The branch chip has no data behind it in the snapshot schema — nothing
+  records the analyzed branch — and the Legend and help buttons open a panel and the
+  onboarding tour, which is page 9 and chunk 05. The legend itself is rendered permanently on
+  the canvas, as page 4 shows it.
+
+- **`pnpm lint -- --max-warnings 0` does not work.** `project.md` § Commands suggests it as
+  the way to make lint mean "nothing to say". Measured: pnpm forwards `--` literally and
+  ESLint reads `--max-warnings` as a file pattern — `No files matching the pattern
+  "--max-warnings" were found`, exit 2. The form that works is
+  `pnpm exec eslint --max-warnings 0` (exit 0, no output here). This is the mirror image of
+  the `pnpm test --run` note already in that file.
+
+- **Preset matching compared ISO strings, not instants.** Found while verifying `Home`/`End`:
+  a range bound can arrive either straight off the snapshot (`2026-09-02T00:00:00Z`) or from
+  the slider (`2026-09-02T00:00:00.000Z`). Those are the same moment, but string equality
+  said otherwise, so after a `Home`/`End` press the `All time` pill went dark and `Custom`
+  lit up for a range that *was* all time. `activePreset` now compares `Date.parse` values.
+  Confirmed on the built app: `All time` reads `pressed` on load and stays pressed after
+  `Home`/`End` return the range to the full history.
+
+- **The plan's gate-2 recipe is blind to uncommitted files.** Documented above under § Gates.
+  Worth correcting in the plan so a later chunk's probe is not silently vacuous.
+
+## project.md deltas — for the lead to apply at the wave boundary
+
+Not edited here, as instructed. Each item below was measured in this worktree on 2026-09-20.
+
+1. **§ Commands — new command.** Add a row:
+   `| Regenerate the snapshot index | `node scripts/build-snapshot-index.mts` — reads `src/lib/snapshots/` and rewrites `src/lib/view/catalog.generated.ts`. Runs automatically as `prebuild`, so `pnpm build` regenerates it |`
+
+2. **§ Commands — `pnpm build` now runs a prebuild step.** `package.json` gained
+   `"prebuild": "node scripts/build-snapshot-index.mts"`. Measured: pnpm 9.15.4 **does** run
+   `pre*` lifecycle hooks (probe: a `prebuild` of `echo PREBUILD_RAN` printed before
+   `next build`).
+
+3. **§ Commands — correct the `--max-warnings` note.** `pnpm lint -- --max-warnings 0` exits
+   **2** with `No files matching the pattern "--max-warnings" were found`. The working form
+   is `pnpm exec eslint --max-warnings 0`.
+
+4. **§ Convention Map — new row for generated source:**
+   `| `src/**/*.generated.ts` | `pnpm test`, `pnpm build`, `pnpm typecheck` | Written by its generator, never hand-edited; committed so `pnpm dev`/`pnpm test` work without running the generator; a co-located spec asserts the committed copy still matches its source of truth | — |`
+
+5. **§ Conventions — new entry, snapshot discovery:** *"The committed snapshots under
+   `src/lib/snapshots/` are reached through `src/lib/view/catalog.ts`, never by reading the
+   directory. The index it imports is generated by `scripts/build-snapshot-index.mts` as a
+   list of static `import`s, because a source directory nothing imports is not carried into
+   the build output — measured 2026-09-20: `find .next -path '*snapshots*' -name '*.json'`
+   returns nothing while the snapshot's merge SHA appears in
+   `.next/server/chunks/ssr/*.js`. Adding a snapshot means re-running the generator;
+   `src/lib/view/catalog.test.ts` fails until you do."*
+
+6. **§ Conventions — new entry, dagre's export shape:** *"`@dagrejs/dagre@3.1.1`'s **default**
+   export carries `{graphlib, version, layout, debug, util}` and **not** `Graph` — so
+   `import dagre from '@dagrejs/dagre'; new dagre.Graph()` throws `TypeError:
+   default.Graph is not a constructor`. Use the named exports: `import { Graph, layout } from
+   '@dagrejs/dagre'`. dagre reports a node's **centre**; React Flow positions by the
+   **top-left** corner."*
+
+7. **§ Layout — `src/lib/view/`** now exists: view derivation and the snapshot catalog. Same
+   rules as the rest of `src/lib/` (standalone functions, relative `.ts` specifiers,
+   co-located specs). `src/components/canvas/` holds this app's presentation components.
+
+8. **§ Stack — no new dependency.** `@xyflow/react` 12.11.6 and `@dagrejs/dagre` 3.1.1 were
+   already listed and are now in use; the two-handle slider needed nothing new.
+
+## Left alone
+
+- **Every committed snapshot is serialized into the RSC payload**, because `GrainWorkspace`
+  is a client component that receives `snapshots` for all catalog entries. At four snapshots
+  of ~24KB that is fine; once chunk 03's **enriched** snapshots land it may not be, since
+  enrichment adds a record per merge SHA. The fix is to lift the selection into the route
+  (a segment or a search param) so the server sends one snapshot — which is naturally chunk
+  06's work, since it already has to put the repository in the URL. Not done here: it would
+  make this chunk dynamic and undo the static-prerender property the deployment measurement
+  rests on.
+- **`pnpm dev` was not exercised.** `project.md` warns that `next dev` rewrites agent files
+  on every start, and I did not want to dirty `AGENTS.md`/`CLAUDE.md` in this worktree. The
+  stronger measurement — `pnpm build` plus `pnpm start` over HTTP — was done instead.
+- **No component-rendering test framework was added.** There is no `jsdom` environment and no
+  `@testing-library/react` in this project, and adding either is a dependency decision
+  outside this chunk. Gate 3 therefore asserts against the component source, and I
+  corroborated it by reading computed styles from the running app rather than by claiming
+  the source grep proves the render.
+- **The slider's day-granular readout rounds a sub-day window up.** A one-hour selection
+  reads "1 day · no activity". The designs' readout is day-granular and every design example
+  is multi-day; changing it would mean a second time format for a case the designs never
+  show.
+- **The picker now shows two rows both labelled `xyflow/xyflow`**, distinguished only by
+  their subtitle (`100 pull requests` vs `6 pull requests · not enriched`). That is the
+  honest consequence of two committed snapshots of the same repository at different windows,
+  and the ids behind them differ, so nothing is ambiguous to the code. It is a little
+  ambiguous to a reader. Left alone: the picker's evolution is chunk 06's (it adds `Other…`,
+  the URL input and the back arrow), and the fix — showing the window alongside the
+  repository — belongs in that pass rather than bolted on at a merge.
+- **The session scratchpad is shared between parallel agents, and it silently corrupted a
+  gate run.** My gate scripts lived at
+  `…/71fa1585-…/scratchpad/gate2.sh`. On the final iteration-3 run that script produced
+  `FAIL: expected a committed snapshot per curated repository, found 1` — a message I never
+  wrote. The file had been overwritten (timestamp 09:37, mine was 08:55) with what is
+  plainly **chunk 03's** gate 2: it counts committed snapshots and asserts every pull
+  request carries enrichment. Nothing was wrong with chunk 04; a different chunk's gate was
+  running against my tree. Re-created mine as `chunk04-gate2.sh`, re-ran it and its three
+  negative controls, all correct. Flagging it because the failure mode is quiet in the
+  dangerous direction too — a *passing* borrowed gate would have read as evidence. Worth a
+  per-chunk filename convention, or per-agent scratchpad isolation, for the next parallel
+  wave.
+- **The slider's footer hint does not mention Up/Down**, although the unmodified primitive
+  already gives the focused thumb's Up/Down the same effect as Left/Right. Raised as a
+  non-blocking warning in review iteration 2 and deliberately not acted on: the lead scoped
+  iteration 3 to the three mutants plus the disclosure, and a free affordance is better
+  documented alongside whatever decision settles `⇕ resize` than bolted onto the hint string
+  now. One-word change when someone wants it.
+- **The lower clamp in `volumeSeries`, `Math.max(0, …)`, remains unpinned.** It is
+  unreachable: `volumeSeries` derives `start` from `historyBounds(snapshot)`, which is
+  already widened down to the earliest merge, so `offset` cannot be negative for *any*
+  snapshot the schema admits — not merely for ingester output. Under the lead's stopping
+  rule this is a warning, not a blocker, and writing a test for it would mean writing one
+  that cannot distinguish anything.
+- **`src/lib/ingest/github.ts` exports a `WindowBounds` type** (`{since, until, …}`) that
+  looks like this chunk's `DateRange`. It is not the same concept — it parameterizes the
+  GitHub listing query — so it was not reused or consolidated. Noted in § Reuse audit.
+
+## Reuse audit
+
+Searched three ways before writing any date-range or grouping helper, as the plan required.
+All searches uncapped.
+
+- **By name** — `grep -rniE '\b(dateRange|histogram|bucket|groupBy|inRange|between|windowOf|clamp)\b' src scripts --include='*.ts' --include='*.tsx' --include='*.mts' -c`, run before any code was written and re-run afterwards. Excluding this chunk's own files, the only non-zero counts are 1 each in `src/lib/snapshot.ts` (the `window` **field name**), `src/lib/ingest/topology.ts`, `src/lib/ingest/ingest.ts` and `src/components/ui/select.tsx` (`SelectGroup`). **New: no existing implementation found.**
+- **By algorithm** (`group`, `bucket`, `range`) — the uncapped listing over `src` and `scripts` returned only Tailwind class strings (`group/badge`, `group/card`, `slider-range`), `SelectGroup` in the shadcn primitive, and prose in comments. No bucketing or grouping utility exists. **New: no existing implementation found.**
+- **By problem** (`window`, `between`, `histogram`) — the only real hits are ingest-side: `WindowBounds` in `src/lib/ingest/github.ts:94` and the window checks in `ingest.ts`. **Reuse considered and rejected:** `WindowBounds` parameterizes the GitHub listing query (it exists to bound the fetch), not a view range over an already-captured snapshot; importing it would tie the view layer to the ingest layer for a two-field object. No consolidation.
+- **Schema types** — `Snapshot`, `PackageNode`, `PackageEdge`, `IndirectReach`, `PullRequestRecord` are **imported from `src/lib/snapshot.ts`**, never re-declared. `derive.ts` imports `PackageEdge`, `PullRequestRecord` and `Snapshot`; `catalog.ts` imports `snapshotSchema` and `Snapshot`.
+- **Attribution** — `src/lib/ingest/attribution.ts` already resolves direct-wins precedence per pull request, so `deriveWindow` reads `directPackages`/`indirectPackages` off the snapshot rather than recomputing reachability. **Reuse: the snapshot's own attribution, computed once at ingest.**
