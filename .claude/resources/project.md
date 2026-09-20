@@ -135,7 +135,11 @@ Command behaviour that is not what it looks like:
   Read a rule's real severity with `npx eslint --print-config <file>` rather than assuming.
   Nothing here is unguarded — `tsc` catches const reassignment — but never treat "lint
   passed" as "lint had nothing to say", and if you need it to mean that, run
-  `pnpm lint -- --max-warnings 0`.
+  `pnpm exec eslint --max-warnings 0`. **Not `pnpm lint -- --max-warnings 0`** — that exits
+  **2** with `No files matching the pattern "--max-warnings"`, because the `lint` script is
+  bare `eslint` and pnpm appends the forwarded argument as a path. Corrected 2026-09-20 by
+  chunk 04, which measured it; an earlier version of this bullet recommended the broken form.
+  Re-verified independently by the lead: the `--` form exits 2, the `pnpm exec` form exits 0.
 - **A zero exit from `pnpm test` does not mean your spec ran.** Measured 2026-09-20 on
   vitest@5.0.1: when the include pattern matches *nothing at all* it exits 1 with
   `No test files found, exiting with code 1`. But a spec that sits outside
