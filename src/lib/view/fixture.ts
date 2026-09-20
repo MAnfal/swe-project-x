@@ -54,3 +54,95 @@ export function snapshotWithDeclaredWindow(
     pullRequests,
   });
 }
+
+/**
+ * The committed snapshot the enrichment pass has run over — 100 pull requests, every one
+ * with an enrichment record. Captured output of `scripts/ingest.mts --enrich`, so the
+ * level-2 and level-3 derivations are exercised against what the real producer wrote.
+ */
+export const ENRICHED_SNAPSHOT_FILE = 'xyflow-xyflow-2026-06-22.json';
+
+/**
+ * The real enriched snapshot with one property varied, re-parsed through the schema.
+ *
+ * The committed snapshots are "absent, or complete — never partial"
+ * (`src/lib/ai/baked-snapshots.test.ts`), so no captured file contains a pull request the
+ * enrichment record is missing for, or a merge GitHub reported no SHA for. Both shapes
+ * are admitted by `snapshotSchema`, and Principle 5 says the view renders anything the
+ * schema validates — so the guards for them need inputs built here rather than drawn from
+ * a fixture that cannot contain them.
+ *
+ * Same technique as `snapshotWithDeclaredWindow`: every pull request stays the real
+ * captured object and only the field under test moves. The snapshot file is never edited.
+ */
+export function enrichedSnapshot(): Snapshot {
+  return loadSnapshot(ENRICHED_SNAPSHOT_FILE);
+}
+
+/** The enriched snapshot with the named pull requests' enrichment records deleted. */
+export function snapshotMissingEnrichmentFor(numbers: readonly number[]): Snapshot {
+  const snapshot = enrichedSnapshot();
+  const drop = new Set(
+    snapshot.pullRequests
+      .filter((pullRequest) => numbers.includes(pullRequest.number))
+      .map((pullRequest) => pullRequest.mergeCommitSha ?? String(pullRequest.number)),
+  );
+  const enrichment = Object.fromEntries(
+    Object.entries(snapshot.enrichment ?? {}).filter(([key]) => !drop.has(key)),
+  );
+  return snapshotSchema.parse({ ...snapshot, enrichment });
+}
+
+/** The enriched snapshot with the named pull requests' records replaced by `patch`. */
+export function snapshotWithEnrichment(
+  patch: Record<string, { label: string; approach: string; steps: { commitSha: string; summary: string }[] }>,
+): Snapshot {
+  const snapshot = enrichedSnapshot();
+  return snapshotSchema.parse({ ...snapshot, enrichment: { ...(snapshot.enrichment ?? {}), ...patch } });
+}
+
+/**
+ * The enriched snapshot narrowed to the named pull requests, with `mergeCommitSha` cleared
+ * and the enrichment re-keyed by pull request number — what `enrichmentKey` falls back to
+ * when GitHub reports no merge commit.
+ */
+export function snapshotWithoutMergeCommitSha(numbers: readonly number[]): Snapshot {
+  const snapshot = enrichedSnapshot();
+  const stored = snapshot.enrichment ?? {};
+  const pullRequests = snapshot.pullRequests.filter((pullRequest) => numbers.includes(pullRequest.number));
+  const enrichment = Object.fromEntries(
+    pullRequests.map((pullRequest) => [
+      String(pullRequest.number),
+      stored[pullRequest.mergeCommitSha ?? String(pullRequest.number)],
+    ]),
+  );
+
+  return snapshotSchema.parse({
+    ...snapshot,
+    metadata: { ...snapshot.metadata, pullRequestCount: pullRequests.length },
+    pullRequests: pullRequests.map((pullRequest) => ({ ...pullRequest, mergeCommitSha: null })),
+    enrichment,
+  });
+}
+
+/** The enriched snapshot with extra declared dependency edges — used to build a cycle. */
+export function snapshotWithExtraEdges(
+  extra: readonly { from: string; to: string; kind: 'dependencies' }[],
+): Snapshot {
+  const snapshot = enrichedSnapshot();
+  return snapshotSchema.parse({
+    ...snapshot,
+    packages: { ...snapshot.packages, edges: [...snapshot.packages.edges, ...extra] },
+  });
+}
+
+/** The enriched snapshot with the named pull request's title replaced. */
+export function snapshotWithTitle(number: number, title: string): Snapshot {
+  const snapshot = enrichedSnapshot();
+  return snapshotSchema.parse({
+    ...snapshot,
+    pullRequests: snapshot.pullRequests.map((pullRequest) =>
+      pullRequest.number === number ? { ...pullRequest, title } : pullRequest,
+    ),
+  });
+}

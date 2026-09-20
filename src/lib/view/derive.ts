@@ -1,4 +1,5 @@
-import type { PackageEdge, PullRequestRecord, Snapshot } from '../snapshot.ts';
+import type { ChangedFile, EnrichmentEntry, PackageEdge, PullRequestRecord, Snapshot } from '../snapshot.ts';
+import { enrichmentKey, fallbackEnrichment, isFallbackEnrichment } from '../ai/enrichment-record.ts';
 
 /**
  * What the canvas needs for one selected range, derived from a snapshot.
@@ -292,4 +293,338 @@ export function neighbourhood(view: WindowView, name: string): Set<string> {
     if (edge.to === name) near.add(edge.from);
   }
   return near;
+}
+
+// ---------------------------------------------------------------------------------------
+// Level 2 — the changes that reached one package, and Level 3 — how one of them was built.
+// ---------------------------------------------------------------------------------------
+
+/** Why a change appears under a package: it changed a file there, or it arrived through one. */
+export type ChangeInclusion =
+  | { kind: 'direct' }
+  | { kind: 'indirect'; through: string; path: string[] };
+
+/** One change card on Level 2. Everything the card renders, already resolved. */
+export type ChangeSummary = {
+  /** The enrichment key — the merge SHA, or the number when GitHub reported no merge commit. */
+  key: string;
+  number: number;
+  /** The pull request's own title, always present. */
+  title: string;
+  /** The enrichment label, or the title when there is no real enrichment record. */
+  label: string;
+  /** The approach note, or null when enrichment is absent or degraded. Never truncated. */
+  approach: string | null;
+  /** True when `label` is the pull request's own title rather than a model result. */
+  fallback: boolean;
+  author: string | null;
+  mergedAt: string;
+  url: string;
+  inclusion: ChangeInclusion;
+  /** The packages the change spanned, the expanded one first when it was touched directly. */
+  packages: string[];
+  /** How many steps the chain has. Zero when there is no real enrichment record. */
+  stepCount: number;
+  additions: number;
+  deletions: number;
+};
+
+/** One step card on Level 3. */
+export type StepDetail = {
+  /** 1-based, so it can be read aloud as "step 3". */
+  position: number;
+  commitSha: string;
+  /** Git's own canonical short form, which is what the card shows. */
+  shortSha: string;
+  summary: string;
+  /** The commit on GitHub, or the pull request when the commit cannot be resolved. */
+  url: string;
+  files: ChangedFile[];
+  /** The owners of `files`, in order. `null` is the repository root. */
+  packages: (string | null)[];
+  additions: number;
+  deletions: number;
+  /** True on the first step whose files the expanded package owns — where it entered. */
+  entryPoint: boolean;
+};
+
+export type StepChain = {
+  change: ChangeSummary;
+  /** Empty when the change has no real enrichment record, rather than a synthetic step. */
+  steps: StepDetail[];
+  /** Every file the change touched, whatever the chain attributes where. */
+  files: ChangedFile[];
+  /** The position of the entry-point step, or null when no step's files that package owns. */
+  entryStep: number | null;
+  additions: number;
+  deletions: number;
+};
+
+/** Git's canonical abbreviation length, so a step's SHA reads the way `git log` prints it. */
+const SHORT_SHA_CHARS = 7;
+
+/**
+ * The enrichment record for a change, or undefined when there is nothing real to show.
+ *
+ * Three ways there is nothing: the snapshot has no `enrichment` key at all (an un-enriched
+ * capture), it has one but not for this change, or it has a *degraded* record — a failure
+ * receipt written by the bake, which `isFallbackEnrichment` identifies. All three collapse
+ * to the same thing for a renderer, which is why they collapse here rather than at three
+ * call sites.
+ *
+ * `hasOwnProperty` rather than a bare lookup: `enrichment` is a record keyed by
+ * repository-derived strings, so an inherited `Object.prototype` key must not answer.
+ */
+function realEnrichment(snapshot: Snapshot, pullRequest: PullRequestRecord): EnrichmentEntry | undefined {
+  const stored = snapshot.enrichment;
+  if (stored === undefined) return undefined;
+
+  const key = enrichmentKey(pullRequest);
+  if (!Object.prototype.hasOwnProperty.call(stored, key)) return undefined;
+
+  const entry = stored[key];
+  return isFallbackEnrichment(entry) ? undefined : entry;
+}
+
+function sumAdditions(files: readonly ChangedFile[]): number {
+  return files.reduce((total, file) => total + file.additions, 0);
+}
+
+function sumDeletions(files: readonly ChangedFile[]): number {
+  return files.reduce((total, file) => total + file.deletions, 0);
+}
+
+function reachedBy(pullRequest: PullRequestRecord, name: string): ChangeInclusion | null {
+  if (pullRequest.directPackages.includes(name)) return { kind: 'direct' };
+
+  const reach = pullRequest.indirectPackages.find((candidate) => candidate.package === name);
+  return reach === undefined ? null : { kind: 'indirect', through: reach.through, path: [...reach.path] };
+}
+
+/**
+ * One change, resolved against the package it is being read under.
+ *
+ * The label falls back to `fallbackEnrichment`'s rather than re-deriving the rule here —
+ * a change with no enrichment and a change whose enrichment failed must read identically,
+ * and two copies of "use the title, or the number when there is no title" drift.
+ */
+export function summarizeChange(
+  snapshot: Snapshot,
+  pullRequest: PullRequestRecord,
+  packageName: string,
+): ChangeSummary {
+  const inclusion = reachedBy(pullRequest, packageName);
+  if (inclusion === null) {
+    throw new Error(`pull request #${pullRequest.number} never reached "${packageName}"`);
+  }
+
+  const entry = realEnrichment(snapshot, pullRequest);
+  const others = [...pullRequest.directPackages].sort((a, b) => a.localeCompare(b));
+
+  return {
+    key: enrichmentKey(pullRequest),
+    number: pullRequest.number,
+    title: pullRequest.title,
+    label: entry?.label ?? fallbackEnrichment(pullRequest).label,
+    approach: entry?.approach ?? null,
+    fallback: entry === undefined,
+    author: pullRequest.author,
+    mergedAt: pullRequest.mergedAt,
+    url: pullRequest.url,
+    inclusion,
+    // Directly touched: the expanded package leads, because that is what the reader came
+    // for. Reached through a dependency: it trails the packages the change actually named,
+    // so the chips read in the direction the change travelled.
+    packages:
+      inclusion.kind === 'direct'
+        ? [packageName, ...others.filter((name) => name !== packageName)]
+        : [...others, packageName],
+    stepCount: entry?.steps.length ?? 0,
+    additions: sumAdditions(pullRequest.files),
+    deletions: sumDeletions(pullRequest.files),
+  };
+}
+
+/**
+ * Every change that reached a package in the selected range, oldest merge first.
+ *
+ * Ordered by merge date ascending rather than by the newest-first order `deriveWindow`
+ * reports: Level 2 is read as a narrative of what happened while the owner was away, and
+ * design page 5 lists its cards oldest first. Ties break on the pull request number, so
+ * two merges recorded at the same second still have one order.
+ *
+ * `activityOf` is called for its throw: a package name that is not in the snapshot is a
+ * typo, and an empty list would hide it.
+ */
+export function packageChanges(snapshot: Snapshot, view: WindowView, packageName: string): ChangeSummary[] {
+  activityOf(view, packageName);
+
+  return view.pullRequests
+    .filter((pullRequest) => reachedBy(pullRequest, packageName) !== null)
+    .sort((a, b) => Date.parse(a.mergedAt) - Date.parse(b.mergedAt) || a.number - b.number)
+    .map((pullRequest) => summarizeChange(snapshot, pullRequest, packageName));
+}
+
+/** The pull request a number names, inside the selected range. Throws rather than returning undefined. */
+export function changeOf(view: WindowView, number: number): PullRequestRecord {
+  const found = view.pullRequests.find((pullRequest) => pullRequest.number === number);
+  if (found === undefined) throw new Error(`no change numbered ${number} in this range`);
+  return found;
+}
+
+type FileGroup = { package: string | null; files: ChangedFile[] };
+
+/**
+ * The packages ordered so that a dependency precedes anything in the set that declares it.
+ *
+ * This is what makes the step chain read outward — from the package the work started in
+ * to the one the reader owns — and it is what gives the entry-point marker its meaning.
+ *
+ * A declared cycle leaves no package ready, which would spin forever and, worse, drop the
+ * files those packages own. `pnpm` tolerates cycles through `devDependencies` and the
+ * schema does not reject one, so the branch below emits whatever is left in name order and
+ * moves on. No captured manifest set in this repository declares a cycle, so nothing in a
+ * committed snapshot reaches it.
+ */
+function dependencyFirst(edges: readonly PackageEdge[], names: readonly string[]): string[] {
+  const inSet = new Set(names);
+  const dependsOn = new Map<string, Set<string>>(names.map((name) => [name, new Set<string>()]));
+  for (const edge of edges) {
+    if (inSet.has(edge.from) && inSet.has(edge.to)) dependsOn.get(edge.from)?.add(edge.to);
+  }
+
+  const byName = (a: string, b: string) => a.localeCompare(b);
+  const remaining = new Set(names);
+  const ordered: string[] = [];
+  while (remaining.size > 0) {
+    const ready = [...remaining]
+      .filter((name) => [...(dependsOn.get(name) ?? [])].every((dependency) => !remaining.has(dependency)))
+      .sort(byName);
+
+    if (ready.length === 0) {
+      // A cycle — nothing is ready and nothing ever will be. Emit the rest in name order
+      // rather than spinning, and rather than dropping the files those packages own.
+      ordered.push(...[...remaining].sort(byName));
+      break;
+    }
+
+    for (const name of ready) {
+      ordered.push(name);
+      remaining.delete(name);
+    }
+  }
+  return ordered;
+}
+
+/** The change's files grouped by the package that owns them, dependency-first, root last. */
+function fileGroups(snapshot: Snapshot, pullRequest: PullRequestRecord): FileGroup[] {
+  const byPackage = new Map<string | null, ChangedFile[]>();
+  for (const file of pullRequest.files) {
+    const existing = byPackage.get(file.package);
+    if (existing === undefined) byPackage.set(file.package, [file]);
+    else existing.push(file);
+  }
+
+  const named = [...byPackage.keys()].filter((name): name is string => name !== null);
+  const groups: FileGroup[] = dependencyFirst(snapshot.packages.edges, named).map((name) => ({
+    package: name,
+    files: byPackage.get(name) ?? [],
+  }));
+
+  // Files owned by no package — changesets, CI config, root manifests — are supporting
+  // work, so they trail the packages rather than leading the narrative.
+  const root = byPackage.get(null);
+  if (root !== undefined) groups.push({ package: null, files: root });
+
+  return groups;
+}
+
+/**
+ * Spreads the file groups across the ordered steps.
+ *
+ * **The snapshot attributes files to a pull request, not to a commit** — `commitSchema` is
+ * `{sha, message}` and nothing in the ingest carries a per-commit file list, so which files
+ * a given step touched is not recorded anywhere. Rather than invent that attribution, the
+ * groups are handed out by package, which is a real structure the snapshot does carry, and
+ * the step cards say so.
+ *
+ * With more groups than steps each step takes a contiguous run of them, the earlier steps
+ * taking the remainder. With fewer, the groups are **right-aligned**: the chain still ends
+ * on the package the change landed in, and the leading steps carry no files rather than
+ * being handed someone else's.
+ *
+ * `stepCount` is at least one — `stepChain` does not call this for an empty chain.
+ */
+function assignGroups(groups: readonly FileGroup[], stepCount: number): FileGroup[][] {
+  const slots: FileGroup[][] = Array.from({ length: stepCount }, () => []);
+
+  if (groups.length < stepCount) {
+    const offset = stepCount - groups.length;
+    groups.forEach((group, index) => slots[offset + index].push(group));
+    return slots;
+  }
+
+  const base = Math.floor(groups.length / stepCount);
+  const extra = groups.length % stepCount;
+  let cursor = 0;
+  for (let index = 0; index < stepCount; index += 1) {
+    const size = base + (index < extra ? 1 : 0);
+    for (let taken = 0; taken < size; taken += 1) {
+      slots[index].push(groups[cursor]);
+      cursor += 1;
+    }
+  }
+  return slots;
+}
+
+/**
+ * Level 3: the ordered chain that produced one change, read under one package.
+ *
+ * A change with no real enrichment gets an **empty** chain rather than the degraded
+ * record's synthetic single step — that step names no commit the pull request contains and
+ * says nothing. `files` still carries everything the change touched, so the level renders
+ * the change rather than a blank screen.
+ */
+export function stepChain(
+  snapshot: Snapshot,
+  pullRequest: PullRequestRecord,
+  packageName: string,
+): StepChain {
+  const change = summarizeChange(snapshot, pullRequest, packageName);
+  const entry = realEnrichment(snapshot, pullRequest);
+  const declared = entry?.steps ?? [];
+  const slots = declared.length > 0 ? assignGroups(fileGroups(snapshot, pullRequest), declared.length) : [];
+  const shas = new Set(pullRequest.commits.map((commit) => commit.sha));
+
+  const steps = declared.map((step, index) => {
+    const groups = slots[index];
+    const files = groups.flatMap((group) => group.files);
+
+    return {
+      position: index + 1,
+      commitSha: step.commitSha,
+      shortSha: step.commitSha.slice(0, SHORT_SHA_CHARS),
+      summary: step.summary,
+      // `resolveSteps` binds every step to a commit at bake time, so an unresolvable SHA
+      // means the record came from somewhere else. Link the change rather than a 404.
+      url: shas.has(step.commitSha) ? `${pullRequest.url}/commits/${step.commitSha}` : pullRequest.url,
+      files,
+      packages: groups.map((group) => group.package),
+      additions: sumAdditions(files),
+      deletions: sumDeletions(files),
+      // Every file a package owns lands in that package's one group, and a group goes to
+      // exactly one step — so at most one step can be the entry point, and "the first
+      // step whose files that package owns" needs no tie-break.
+      entryPoint: files.some((file) => file.package === packageName),
+    } satisfies StepDetail;
+  });
+
+  return {
+    change,
+    steps,
+    files: [...pullRequest.files],
+    entryStep: steps.find((step) => step.entryPoint)?.position ?? null,
+    additions: sumAdditions(pullRequest.files),
+    deletions: sumDeletions(pullRequest.files),
+  };
 }
