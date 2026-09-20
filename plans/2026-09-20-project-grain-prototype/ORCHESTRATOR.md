@@ -38,7 +38,7 @@ See `SPEC.md` in this directory.
 | Chunk | Story | Status | PR | Blocker |
 | ----- | ----- | ------ | -- | ------- |
 | 01 | Foundation | Merged | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
-| 02 | US1 | In progress | — | — |
+| 02 | US1 | PR open | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
 | 03 | US1 | Not started | — | — |
 | 04 | US1 | Not started | — | — |
 | 05 | US1 | Not started | — | — |
@@ -74,6 +74,9 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `wave_started` | — | Wave 2 — preflight clean after the fixes: plan branch 0 behind `origin/main`, all six chunk-02 reference paths resolve, chunk-01 outputs present on the plan branch. Chunk 02's rubric regenerated against the now-populated Convention Map |
 | 2026-09-20 | `chunk_dispatched` | 02 | Worktree `.worktrees/02-ingest-core` on `feat/project-grain-prototype--ingest-core` from `5e49bd2`; bootstrapped with `pnpm install` and a `.env.local` carrying a real `GITHUB_TOKEN` (gitignored) so the fixture can be captured rather than hand-authored. All four gates verified green in the worktree before dispatch |
 | 2026-09-20 | `review_iteration` | 02 | Iteration 1 **FAIL**, narrow — no behavioural defect. Reviewer mutation-tested rather than trusting the red run: 29 mutants, 20 caught, 9 survived (and it invalidated its own first harness run — `--reporter=basic` is not a Vitest 5 reporter, so every run exited 1 and every mutant looked caught). Blockers: three tests that cannot fail, and three references to `scripts/ingest.ts` when the file is `.mts`. Lead reproduced all three independently |
+| 2026-09-20 | `review_passed` | 02 | Iteration 2, fresh reviewer (never reused). 27 mutants, 23 fatal; confirmed the three fixes generalize against 8 *different* wrong implementations, that the zod premise assertion fires, and that `transcriptWithReversedListing()` permutes only what is under test. No blocking issues |
+| 2026-09-20 | `gates_passed` | 02 | Lead re-ran all four at `c1b8266` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Tests 94 passed (94)`, `pnpm build` 0, `pnpm typecheck` 0. Also re-applied 7 mutants independently — all fatal, tree byte-identical after each |
+| 2026-09-20 | `pr_created` | 02 | [#2](https://github.com/MAnfal/swe-project-x/pull/2) → `feat/plan--project-grain-prototype`, at `c1b8266` (7 commits) |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,

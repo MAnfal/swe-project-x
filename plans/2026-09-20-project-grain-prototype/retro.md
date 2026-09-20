@@ -290,6 +290,44 @@ Every one of these is a candidate for `.claude/resources/project.md`.
    one reporting that everything is covered."*
 
 
+#### Chunk 02 — iteration 2 and 3, and what the review loop actually bought
+
+- **Two review iterations, both worth their cost.** Iteration 1 blocked on three tests that
+  could not fail; iteration 2 passed. Neither iteration found a behavioural defect — the
+  code was correct throughout. What the loop bought was *evidence*, and the sortKeysDeep
+  gap in particular would have surfaced as non-deterministic output in chunk 03, two chunks
+  from its cause, since chunk 03 is the first to populate `enrichment`.
+- **The implementer twice went beyond the brief, correctly.** Asked for one comparator test
+  it wrote three, on the argument that *"has a tie-break"* and *"has the right tie-break"*
+  are different claims and only the second protects determinism. It also added two mutants
+  of its own — a narrow `devDependencies`-only drop (the realistic "tidying" regression)
+  and an inverted tie-break (which would survive a test asserting only "not zero"). Both
+  are better mutants than the one I specified.
+- **It also declined a shortcut for the right reason.** To test the tie-break it could have
+  edited two `merged_at` values in the transcript to manufacture a tie. It exported the
+  comparator and spec'd it directly instead, because editing the fixture would have put
+  fabricated data into a file whose entire purpose is being real captured output —
+  Principle 4. The wiring is already pinned by iteration 1's reversed-listing tests.
+
+#### Tribal knowledge — the mutant a reviewer names is the one that gets fixed
+
+1. **The decision.** After iteration 1 named three surviving mutants, I asked the fresh
+   iteration-2 reviewer to find *different* wrong implementations of the same three
+   guarantees, rather than only re-checking the named ones.
+2. **The obvious alternative.** Re-run the three named mutants, confirm they now die, pass
+   the chunk. That is what "verify the fix" normally means and it is what the rubric's
+   wording invites.
+3. **The constraint that made it right.** The fix was written by an implementer who knew
+   exactly which three mutants would be re-run. Tests tuned to kill three named mutants
+   while leaving the surrounding guarantee unpinned would pass that check completely. The
+   second reviewer found eight further wrong implementations and confirmed all eight die —
+   which is what makes the PASS mean something. It also found two *new* gaps the named
+   mutants never touched (`devDependencies`, worth 6 of 13 real edges).
+4. **The recognition signal.** Any review iteration where the previous iteration handed the
+   implementer a specific, enumerable list of failures. The narrower and more actionable
+   the feedback, the more the re-check has to widen to stay honest.
+
+
 ---
 
 ## Cold-start brief
