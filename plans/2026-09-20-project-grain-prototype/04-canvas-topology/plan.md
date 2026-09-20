@@ -33,9 +33,36 @@ many changes reached each one and by which path, is a pure function of the snaps
 selected range. It is written as a function over plain objects and tested directly. The
 React components render what it returns.
 
-This chunk runs in parallel with chunk 03, so it renders the **fixture snapshot committed
-by chunk 02**. It must not assume any baked snapshot exists, and it must render a snapshot
-whose `enrichment` field is absent.
+This chunk runs in parallel with chunk 03, so it must not assume any baked snapshot exists,
+and it must render a snapshot whose `enrichment` field is absent.
+
+**Amended 2026-09-20 at the wave-3 preflight — read this before task T001.** This plan
+previously said the chunk renders "the fixture snapshot committed by chunk 02". No such file
+exists. What chunk 02 committed is a *recorded HTTP transcript*,
+`src/lib/ingest/fixtures/xyflow-xyflow-2026-08-31.transcript.json`, not a snapshot. **You
+produce the snapshot yourself**, by replaying that transcript through the committed
+ingester — which needs no token and no network. Measured by the lead on 2026-09-20 on the
+plan-branch tip; this exact command exits 0 and prints
+`xyflow/xyflow …: 10 packages, 6 pull requests`:
+
+```bash
+node scripts/ingest.mts --repo xyflow/xyflow \
+  --since 2026-08-31T00:00:00Z --until 2026-09-02T00:00:00Z \
+  --out src/lib/snapshots/xyflow-xyflow-2026-08-31.json \
+  --replay src/lib/ingest/fixtures/xyflow-xyflow-2026-08-31.transcript.json
+```
+
+Commit that file. It is captured output of the real producer, so Principle 4 is satisfied —
+do not hand-author or hand-edit it, and regenerate it by re-running the command if it needs
+to change. It carries no `enrichment`, which is exactly the shape the Test Plan's
+snapshot-without-enrichment spec needs and the state the picker must render.
+
+**The committed snapshot directory is `src/lib/snapshots/`**, files named
+`<owner>-<repo>-<since-date>.json`. Chunk 03 bakes its three curated repositories into the
+same directory under its own window-qualified names, in parallel with you. The window above
+is yours; do not touch any other file in that directory, and expect chunk 03's files not to
+exist on your base. After both merge the picker lists four snapshots, one of them
+un-enriched — that is intended, and it is the case your renderer must already handle.
 
 ## Design Input — the designs are delivered; build against them
 
@@ -136,6 +163,9 @@ the back arrow; leave room for them but do not build them here.
 
 ### Tasks
 
+- [ ] T000 — replay chunk 02's committed transcript to produce
+      `src/lib/snapshots/xyflow-xyflow-2026-08-31.json` and commit it, using the exact
+      command in Context. Every spec below reads it, so it lands first
 - [ ] T001 — write failing spec for window derivation — asserts the active set for a range,
       and that a package with no pull requests in the range is inactive; fails because no
       derivation module exists
@@ -182,7 +212,7 @@ installed `@xyflow/react` before relying on it. Where the measurement contradict
 | Layout spec (T004) | A known graph returns positioned nodes; the same input returns the same positions | No layout module exists |
 | Snapshot-without-enrichment spec | Derivation succeeds on a snapshot whose `enrichment` is absent | No derivation module exists |
 
-All five run against the fixture snapshot chunk 02 committed. Assert the values a consumer
+All five run against the snapshot you replay and commit (see Context). Assert the values a consumer
 receives — the active set, the counts — not the shape of the input handed in.
 
 ## Reuse Audit
@@ -199,6 +229,7 @@ ways: by name, by algorithm (`group`, `bucket`, `range`), and by problem (`windo
 | `.claude/resources/project.md` | Stack, gate commands, Principles, Convention Map — including "no model call in the render path" |
 | `.claude/resources/bibles/swe/testing.md` | Assert the resolved value a consumer receives, not the input; test against the captured fixture rather than a hand-rolled approximation |
 | `plans/2026-09-20-project-grain-prototype/02-ingest-core/plan.md` | The snapshot schema this chunk reads, including that `enrichment` is optional |
+| `src/lib/snapshot.ts` | The merged schema itself — `Snapshot`, `PackageNode`, `PackageEdge`, `IndirectReach` types to import rather than re-declare |
 
 ## External Dependencies
 
@@ -218,13 +249,13 @@ set -euo pipefail
 
 # Gate 1 — standard gates from project.md, type check last.
 pnpm lint
-pnpm test --run
+pnpm test
 pnpm build
-pnpm exec tsc --noEmit
+pnpm typecheck
 
 # Gate 2 — the repository picker discovers snapshots rather than hardcoding them. Assert no
 # source file outside the snapshot directory contains a literal curated repository name.
-src=$(git ls-files 'src/**/*.ts' 'src/**/*.tsx' 'app/**/*.tsx' 'lib/**/*.ts' 2>/dev/null | tr '\n' ' ')
+src=$(git ls-files 'src/**/*.ts' 'src/**/*.tsx' 2>/dev/null | tr '\n' ' ')
 if [ -n "$src" ] && grep -nE '"(xyflow/xyflow|shadcn-ui/ui|trpc/trpc)"' $src | grep -vE '^\s*(//|\*)'; then
   echo "FAIL: a curated repository name is hardcoded in source" >&2; exit 1
 fi
@@ -248,6 +279,8 @@ not with `git checkout --` — and confirm the gate returns clean.
 
 - [ ] `completion-report.md` in this directory, **committed**, written from
       `.claude/resources/templates/completion-report.md`
+- [ ] `src/lib/snapshots/xyflow-xyflow-2026-08-31.json`, **committed** — produced by
+      replaying chunk 02's transcript, never hand-edited
 - [ ] A derivation module: active set, direct and indirect counts, volume series, history
       bounds — tested directly
 - [ ] A layout module using dagre

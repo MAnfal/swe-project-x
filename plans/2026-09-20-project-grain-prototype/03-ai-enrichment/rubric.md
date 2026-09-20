@@ -49,7 +49,13 @@ often as it passes a violation.
 - [ ] The approach note describes how the change was made, not a restatement of what
       changed — graded by reading several baked records, not by field presence alone
 - [ ] Enrichment is keyed by merge commit SHA, and the key derivation lives in one place
-      that chunk 06 can reuse
+      that a later live-ingest chunk can reuse
+- [ ] `mergeCommitSha` is nullable in the merged schema, so the chunk has a stated, tested
+      rule for a pull request that has none — and Gate 2's accessor matches whatever rule
+      was chosen
+- [ ] Each step carries the commit it came from: the merged `enrichmentEntrySchema`
+      requires `{ commitSha, summary }` per step with at least one step. A step list of
+      bare phrases, or a degraded record written with an empty step array, fails this
 - [ ] A model failure degrades to the pull-request title and is counted and reported; no
       code path can yield an empty label
 - [ ] No test calls the real model API, and assertions are on the returned record rather
@@ -62,8 +68,104 @@ often as it passes a violation.
       a key, and no key appears in a snapshot
 - [ ] The model input is bounded to metadata rather than full patches, or the report
       explains why that was insufficient
+- [ ] The default model id is `claude-haiku-4-5`, read from an environment variable rather
+      than hardcoded at the call site, so escalating the model needs no code change
+- [ ] `output_config.effort` is **not** set — effort errors on Haiku 4.5, which is not an
+      Opus-family model. Grade the request options actually passed to `generateObject`
+- [ ] The payload is bounded before the call, not after: Haiku 4.5's context is 200K while
+      the merged schema permits 1000 commits and 3000 files per pull request, so a
+      pathological record must be capped rather than sent whole. The report says what was
+      capped and how
+- [ ] The completion report carries measured input/output token totals per repository, not
+      just a pull-request count. Those numbers are the evidence any later decision to
+      escalate the model would rest on, and they cannot be recovered after the bake
+- [ ] The `approach` notes are graded by **reading several baked records**. If they read as
+      restatements of what changed rather than how it was done, that is the documented
+      trigger to escalate the model (ORCHESTRATOR.md § Design Decisions 10) — report it as a
+      finding with quoted examples rather than passing it silently
 - [ ] `project.md` was not edited by this chunk; deltas are reported for the wave boundary
 - [ ] The judgment calls the plan enumerated are each explained in the completion report
+
+### From the Convention Map — `src/lib/**/*.ts`
+
+Gates for this area: `pnpm test`, `pnpm lint`, `pnpm typecheck`.
+
+- [ ] The enrichment module is standalone functions over plain objects — no class
+      hierarchy, no registry, and no provider interface with exactly one implementation.
+      A "model provider" seam built for a second vendor is the abstraction
+      ORCHESTRATOR.md § Complexity rejects by name
+- [ ] No `fs` write and no `child_process` call anywhere under `src/lib/` (Principle 3).
+      Writing the baked snapshot happens in `scripts/`, which may write files
+- [ ] `ANTHROPIC_API_KEY` is not read inside `src/lib/` (Principle 1) — the key or a
+      configured client arrives as a parameter from the script or route handler that read it
+- [ ] Sibling modules are imported by **relative specifier with an explicit `.ts`
+      extension**, never `@/`. The CLI runs under bare Node, which strips types without
+      reading tsconfig `paths`, so an `@/` import works under Vitest and Next and breaks
+      `scripts/ingest.mts` — and nothing else catches it
+- [ ] Every new module under `src/lib/` has a co-located `*.test.ts`
+- [ ] Enrichment reuses `enrichmentEntrySchema` / `enrichmentSchema` exported from
+      `src/lib/snapshot.ts` rather than declaring a second definition of the same shape
+      (Principle 5 — one snapshot schema). A narrower schema shaped for `generateObject`
+      is fine; a parallel hand-written type or a second snapshot schema is not
+- [ ] Any repository-derived string used as an `enrichment` key goes through
+      `assertSafeKey` / `buildRecord` from `src/lib/snapshot.ts`, not through the Zod
+      schema. Measured on zod 4.6.5: `z.record` accepts `{"__proto__": …}` and silently
+      drops the key rather than rejecting it, and `.refine` cannot see it either
+
+### From the Convention Map — `scripts/**`
+
+Gates for this area: `pnpm lint`, `pnpm typecheck`.
+
+- [ ] The CLI stays **thin**: it parses arguments and sequences `src/lib/` functions, and
+      holds no enrichment domain logic of its own
+- [ ] Reading `ANTHROPIC_API_KEY` here is legal (Principle 1), and writing the baked
+      snapshot here is legal (Principle 3 forbids filesystem writes only on paths
+      reachable from a route handler; a CLI is not one)
+- [ ] It imports `src/lib/` by relative specifier with an explicit extension, never `@/`
+- [ ] No co-located spec for the script — the logic it drives is tested in `src/lib/`
+- [ ] The bake path extends `scripts/ingest.mts` rather than adding a second CLI
+
+### From the Convention Map — `src/**/*.test.ts`
+
+Gates for this area: `pnpm test`, `pnpm lint`, `pnpm typecheck`.
+
+- [ ] Specs assert the value a consumer receives after resolution, never read back the
+      literal handed in, and never assert merely that a mock was invoked —
+      `.claude/resources/bibles/swe/testing.md`
+- [ ] Specs live under `src/` named `<module>.test.ts`. `vitest.config.mts` includes
+      exactly `src/**/*.test.{ts,tsx}`; a spec outside that is never discovered and
+      passes by not running
+- [ ] The reported passing count is asserted, not just a zero exit — a spec outside the
+      include pattern is skipped silently while the run still exits 0
+
+### From the Convention Map — `src/**/snapshots/**/*.json`
+
+Gate for this area: `pnpm test`.
+
+- [ ] Every committed snapshot is **captured output of the bake pipeline**, committed as
+      written, and regenerated by re-running the producer rather than edited by hand
+      (Principle 4); the completion report names the exact command that produces each —
+      `.claude/resources/bibles/swe/testing.md`
+- [ ] No snapshot contains a credential, and no snapshot carries a token in a URL
+
+### From the Convention Map — manifests and config
+
+Gates for this area: `pnpm install`, `pnpm build`, `pnpm typecheck`.
+
+- [ ] Any new dependency was added with `pnpm add` rather than by hand-editing
+      `package.json`, and the lockfile is committed with it
+- [ ] **Plan constraint overrides the map here.** The Convention Map says a new dependency
+      or command is recorded in `project.md` in the same chunk; this plan forbids chunks
+      02–06 from editing that file, to avoid a parallel-wave merge conflict. Grade
+      instead: `project.md` is **unmodified** in the diff, and every architecture-fact
+      delta appears in the completion report's "project.md deltas" section
+
+### Parallel-wave boundary
+
+- [ ] The diff does not create, edit or delete
+      `src/lib/snapshots/xyflow-xyflow-2026-08-31.json` — that path belongs to the chunk
+      running in parallel, and this chunk's own bakes use their own window-qualified names
+- [ ] No file under `src/lib/view/`, `src/components/` or `src/app/page.tsx` is touched
 
 ## Verdict
 

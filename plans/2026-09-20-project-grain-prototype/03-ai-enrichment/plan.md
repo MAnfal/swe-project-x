@@ -33,6 +33,40 @@ two make the canvas navigable; this one makes it worth navigating. It is also th
 a later "golden rules" feature would filter on, which is why it is captured now even though
 that feature is out of scope.
 
+**Amended 2026-09-20 at the wave-3 preflight — read this before task T001.** Chunk 02
+merged, and its schema already declares the shape this chunk writes. Three consequences,
+all measured against `src/lib/snapshot.ts` on the plan-branch tip:
+
+- **Do not declare a second enrichment schema.** `enrichmentEntrySchema` and
+  `enrichmentSchema` are exported from `src/lib/snapshot.ts`, and `snapshotSchema.enrichment`
+  is `z.record(z.string().min(1), enrichmentEntrySchema).optional()`. Principle 5 is "one
+  snapshot schema" — import these. A model-output schema for `generateObject` may be a
+  narrower thing you derive from them, but the value written into a snapshot validates
+  against the merged one.
+- **`steps` is not a list of phrases.** The merged schema is
+  `z.array(z.object({ commitSha: z.string().min(1), summary: z.string().min(1) })).min(1)` —
+  each step carries the commit it came from. This plan's prose above describes bare phrases
+  and is wrong; **the merged schema wins**, and your model output must supply a `commitSha`
+  per step drawn from the pull request's own commits. `min(1)` also means the fallback path
+  cannot write an empty step array — decide what a degraded record's single step is, and say
+  so in the completion report. There is no maximum on `steps` in the merged schema, so if you
+  want the bound task T001 asks for, it belongs on your model-output schema, not on a second
+  copy of the snapshot's.
+- **Keys go through `assertSafeKey`/`buildRecord`, not the schema.** Both are exported from
+  `src/lib/snapshot.ts`. `project.md` records the measurement: `z.record` accepts
+  `{"__proto__": …}` and silently drops the key rather than rejecting it, and it names
+  `enrichment` as the case this applies to. Note also that `pullRequestSchema.mergeCommitSha`
+  is **nullable** — decide the key for a pull request GitHub reported no merge SHA for, and
+  make Gate 2's accessor match whatever you choose.
+
+**The committed snapshot directory is `src/lib/snapshots/`**, files named
+`<owner>-<repo>-<since-date>.json`. Chunk 04 runs in parallel and commits one un-enriched
+snapshot there, `xyflow-xyflow-2026-08-31.json`, replayed from chunk 02's transcript. It will
+not be on your base. **Do not create, edit or delete that path** — bake your three curated
+repositories under your own windows, and if your `xyflow/xyflow` window would collide with
+that filename, pick a different window. Two chunks in one parallel wave editing one file is
+the merge conflict this avoids.
+
 **The model never sits between a click and a frame.** Enrichment is keyed by merge commit
 SHA — a pull request's label does not change when the time slider moves — so it is computed
 once and reused forever. This chunk bakes it into committed snapshots for the curated
@@ -68,8 +102,21 @@ Constrain the output so it stays renderable: `label` is a short phrase, `approac
 sentence, `steps` is a bounded ordered list of short phrases. Enforce the bounds in the
 schema, not in a prompt sentence that asks nicely.
 
-**Model**: `claude-opus-5` through `@ai-sdk/anthropic`. Read the model id from an
+**Model**: `claude-haiku-4-5` through `@ai-sdk/anthropic`. Read the model id from an
 environment variable with that as the default, so it can be changed without a code change.
+
+**Changed 2026-09-20, before dispatch** — this plan previously defaulted to `claude-opus-5`
+with no recorded reason. See ORCHESTRATOR.md § Design Decisions 10 for the rationale and the
+escalation trigger. Two Haiku 4.5 specifics that will cost you a cycle if you miss them:
+
+- **Do not set `output_config.effort`.** Effort errors on Haiku 4.5; it is not an Opus-family
+  model. If you want to constrain thinking at all, Haiku 4.5 takes the older
+  `thinking: { type: "enabled", budget_tokens: N }` form — but for a bounded structured
+  extraction like this one you almost certainly want neither.
+- **Context is 200K, not 1M.** Ample for metadata, but `MAX_COMMITS_PER_PULL_REQUEST` is
+  1000 and `MAX_FILES_PER_PULL_REQUEST` is 3000 in the merged schema, so a pathological pull
+  request can still overrun it. Bound the payload before the call rather than discovering
+  the ceiling at bake time, and say in the completion report what you capped and how.
 
 Do not send whole diffs. Commit messages, file paths and the PR body are enough for the
 label and the steps, and they are what keeps one call per pull request affordable. If the
@@ -132,7 +179,7 @@ key is written into a snapshot, and no snapshot carries a token in a URL.
 - [ ] T003 — write failing spec for cache reuse — asserts an already-enriched pull request
       produces no model call; fails because no enrichment module exists
 - [ ] T004 [P] — create the enrichment module — Zod output schema, `generateObject` call,
-      model id from environment with `claude-opus-5` as default
+      model id from environment with `claude-haiku-4-5` as default
 - [ ] T005 — create the fallback and failure-reporting path
 - [ ] T006 — edit the ingest CLI from chunk 02 — add the enrichment step and the bake output
 - [ ] T007 — run the bake for the three curated repositories and commit the snapshots
@@ -180,14 +227,19 @@ code only for the model call itself.
 | `.claude/resources/project.md` | Stack, gate commands, Principles — including "no model call in the render path" and "no secret reaches the client" |
 | `.claude/resources/bibles/swe/testing.md` | Assert the value a consumer receives, not the input handed to a mock; committed snapshots are captured pipeline output, not hand-authored fixtures |
 | `plans/2026-09-20-project-grain-prototype/02-ingest-core/plan.md` | The snapshot schema this chunk writes into, and the CLI it extends |
+| `src/lib/snapshot.ts` | The merged schema itself — `enrichmentEntrySchema`, `enrichmentSchema`, `assertSafeKey`, `buildRecord`. Import these; do not re-declare them |
+| `scripts/ingest.mts` | The CLI this chunk extends rather than replaces |
 
 ## External Dependencies
 
 - `ai` — `generateObject` with a Zod schema for typed, validated model output.
-- `@ai-sdk/anthropic` — the provider. Model `claude-opus-5`, overridable by environment.
-- Anthropic API — one call per pull request at bake time. `claude-opus-5` is $5/MTok input
-  and $25/MTok output; keep the per-call payload to commit messages, file paths and the PR
-  body rather than full patches, and report the total pull-request count baked.
+- `@ai-sdk/anthropic` — the provider. Model `claude-haiku-4-5`, overridable by environment.
+- Anthropic API — one call per pull request at bake time. `claude-haiku-4-5` is $1/MTok
+  input and $5/MTok output; keep the per-call payload to commit messages, file paths and the
+  PR body rather than full patches, and report the total pull-request count baked **and the
+  measured input/output token totals per repository**. Those numbers are what a later
+  decision to escalate the model would be argued from, and nobody can recover them after the
+  bake.
 
 ## Verification Gates
 
@@ -199,9 +251,9 @@ set -euo pipefail
 
 # Gate 1 — standard gates from project.md, type check last.
 pnpm lint
-pnpm test --run
+pnpm test
 pnpm build
-pnpm exec tsc --noEmit
+pnpm typecheck
 
 # Gate 2 — every committed snapshot carries enrichment for every pull request, and every
 # enrichment carries the approach note. Derive the counts from the file; never assert a

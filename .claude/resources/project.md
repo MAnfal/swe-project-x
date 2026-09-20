@@ -115,6 +115,17 @@ Command behaviour that is not what it looks like:
   directory under the flat config. Measured 2026-09-20 after chunk 02: 30 files
   (`pnpm exec eslint --debug | grep -c "Linting "`), including `vitest.config.mts`, the
   specs under `src/`, and `scripts/`. It is not a vacuous no-file run.
+- **`pnpm lint` walks `.worktrees/`, so a leftover chunk worktree breaks the gate in the
+  main checkout.** Because `pnpm lint` runs `eslint` with no path argument, it lints the
+  whole project directory — including any worktree still sitting under `.worktrees/` and
+  that worktree's own `node_modules`. Measured 2026-09-20 at the wave-3 boundary: with
+  `.worktrees/02-ingest-core` present, `pnpm lint` reported
+  `✖ 3240 problems (148 errors, 3092 warnings)` and exited 1; every reported file was under
+  `.worktrees/`. After `git worktree remove`, the same command exits 0 with no output. This
+  is why a merged chunk's worktree is removed as soon as its PR lands — until then the
+  lead's own gate run on the plan branch is unreadable. If a gate must run while a worktree
+  is live, scope it: `pnpm exec eslint src scripts`.
+
 - **`pnpm lint` exits 0 on warnings, and the gate is weaker than it looks.** Only
   error-level rules fail it. Measured 2026-09-20 by the lead: a `const` reassignment plus
   an unused variable planted in `src/lib/ingest/ingest.ts` produced
