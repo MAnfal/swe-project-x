@@ -844,6 +844,104 @@ that was never written down.
 
 ---
 
+### Chunk 06 — Live analysis
+
+Two review iterations, both **FAIL then PASS on the same axis** — and neither was about
+behaviour. This is the first chunk in the plan whose blocking findings were entirely about
+the *report*.
+
+#### The streak broke, and a different one started
+
+Chunks 02, 03, 04 and 05 each failed their first review on an unpinned defensive branch.
+Chunk 06 did not. The dispatch brief carried that carry-forward explicitly, the implementer
+mutation-tested before review, and iteration 1's reviewer went hunting for the same failure
+mode and could not find it — it mutated a guard the report never claimed to cover
+(`createGitHubClient`'s empty-request check, 5 files / 32 tests red) and confirmed the
+three "deleted rather than pinned" branches were genuinely unreachable. **The carry-forward
+worked.** That is the strongest evidence in this plan that the journal pays for itself.
+
+What replaced it: **evidence that could not have been produced.**
+
+#### The defect, and the fact that it recurred inside its own fix
+
+Iteration 1 blocked on two "live end-to-end" transcripts showing output the code cannot
+emit. `/api/enrichment` returns `{key, entry:{label,approach,steps}, cached, fallback}`;
+the report flattened those three fields to the top level and printed `steps` as the integer
+`1` where it is an array of `{commitSha, summary}`. The `complete` event's declared type is
+`{type, snapshot, bound, repository, branch}`; the transcript dropped `type` and `snapshot`
+and added `packages`, `prs` and `enrichment`, which are not fields on it. Cause: the
+implementer piped both probes through `node -e` formatters, kept the formatter's output and
+discarded the raw bytes.
+
+The fix re-captured them — and **pasted the same body twice**. The two "raw and complete"
+enrichment responses were byte-identical, the second reading `cached:false` directly above
+prose claiming it flipped to `true`. The captured files were right; the heredoc was not.
+
+The lead caught it by extracting both quoted bodies and comparing them programmatically
+(`body1 == body2 → True`) rather than reading them, then establishing ground truth against
+a cold instance: `cached=False` at 2.598946 s, `cached=True` at 0.003946 s.
+
+#### What made the second fix different: the method changed, not the text
+
+Per `prompts/review.md`, a recurrence at a new site after a fix at the cited one is where
+citations stop. The lead required distinct capture paths per response, `diff` with its exit
+status shown, script-generated report blocks, and an extended audit of the newly written
+prose.
+
+That is the part worth generalizing, because **re-running found defects that re-reading had
+not**, including one neither review cited: a `complete`-event key list formatted by Python's
+`json.dumps` while presented as node's `JSON.stringify` output — the two space their
+separators differently. The implementer's own 33-claim audit found 12 bad claims, of which
+only 2 were the ones cited; a third instance of the invented-field defect
+(`"enrichment":"absent"`) was self-caught.
+
+**The parts built to be falsified survived every independent re-run intact — the gates, the
+mutation table. It was the prose around them that drifted.** Evidence discipline has to
+reach the narrative, not just the checks.
+
+#### Framework friction — the loop has no gate on report fidelity
+
+Every verification gate in this project checks the *code*. Nothing checks that the
+completion report describes what the code did, and the report is what the reviewer grades
+several rubric items against. Both failures here were caught by a human-equivalent reading
+plus an ad-hoc `python3` comparison the lead improvised twice. Chunk 06's `project.md`
+delta 10 turns the capture procedure into a convention, which is the right layer — but a
+convention is advice, and this chunk violated the advisory version of it twice in a row
+before the mechanical one stuck.
+
+**Proposed** (Part 2): `prompts/gates.md` or the completion-report template should carry a
+self-check for any report containing a transcript — every quoted payload must appear
+byte-for-byte in a captured file, and any two payloads presented as differing must
+actually differ. Chunk 06 wrote exactly that script for itself and proved it non-vacuous by
+running it against the previous commit (`the two are byte-identical: True → self-check
+would exit 1`). It should not have to be reinvented per chunk.
+
+#### The one surviving mutation, and why it is a warning
+
+Iteration 2 mutated away `askedRef` in `grain-workspace.tsx:207` — the "already asked this
+session" guard — and nothing failed, because `project.md` deliberately excludes `pnpm test`
+from the component gate and no chunk in this plan has component specs. The reviewer framed
+it as the one piece of model-spend bounding that is not machine-checked.
+
+The lead narrowed that before accepting it. Line 208's `hasOwnProperty` check on the merged
+`enrichment` record independently blocks a re-expand after a success, and the server's
+per-instance cache blocks the model call even when a request is made. `askedRef` uniquely
+covers the **in-flight double-expand** and the **instance-recycled-mid-session** case. Real,
+but not "spend is unguarded". Filed as
+`plans/ideas/bound-live-route-spend-and-concurrency.md` together with the two the
+implementer flagged, since all three are the same concern — nothing bounds what one
+anonymous request can spend.
+
+#### Carry-forward correction the lead owed
+
+The implementer's report said the ingest fan-out means "200 concurrent GitHub requests".
+Files and commits are awaited sequentially *within* each pull request's chain, so it is
+~100 concurrent chains issuing 200 requests in total. Both reviewers agreed with the
+correction. The finding itself is real and correctly left alone: the lead verified the
+`Promise.all` is untouched by chunk 06's diff and came from chunk 02 (`549d507`).
+
+---
+
 ---
 
 ## Cold-start brief

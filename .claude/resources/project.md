@@ -46,7 +46,12 @@ ranges in `package.json`. Toolchain versions from `node --version` / `pnpm --ver
 - **Styling / UI**: Tailwind CSS 4.3.3; shadcn/ui 4.21.0 CLI on the `base-nova` preset,
   which builds on `@base-ui/react` 1.8.0 (not Radix) and `lucide-react` 1.47.0
 - **Lint**: ESLint 9.39.5 with `eslint-config-next` 16.3.5 (flat config)
-- **Deployment target**: Vercel — no writable filesystem and no git binary at request time
+- **Deployment target**: Vercel — no writable filesystem and no git binary at request time.
+  Both route handlers declare `export const runtime = 'nodejs'` (Octokit and the AI SDK run
+  on neither Edge nor the default). Function duration is declared explicitly rather than
+  left to the platform: `maxDuration = 300` on the analysis route, `60` on enrichment. The
+  free-tier ceiling is 300 s and cannot be raised there
+  (https://vercel.com/docs/functions/configuring-functions/duration, read 2026-09-20)
 
 Dependencies later chunks are built on, all resolved 2026-09-20:
 
@@ -84,6 +89,7 @@ All commands run from the repository root.
 | Run the production build | `pnpm start` — serves the `pnpm build` output at http://localhost:3000. Use this, not `pnpm dev`, for a story checkpoint: it exercises the static prerender and the client chunks that actually ship. Verified 2026-09-20 at the wave-4 boundary (`✓ Ready in 117ms`, HTTP 200) |
 | Ingest a repository | `node scripts/ingest.mts --repo <owner/repo> --since <iso> --until <iso> --out <file>` — also `--branch`, `--max-pull-requests`, `--record <transcript>`, `--record-sample <n>`, `--replay <transcript>`, `--enrich`, `--model <id>`, `--concurrency <n>`, `--reuse <snapshot.json>`. Needs `GITHUB_TOKEN` unless `--replay`; `--enrich` additionally needs `ANTHROPIC_API_KEY` |
 | Bake a curated snapshot | `node scripts/ingest.mts --repo <owner/repo> --since <iso> --until <iso> --out src/lib/snapshots/<owner>-<repo>-<since-date>.json --enrich` — **spends money**, one model call per pull request. Add `--reuse <the same file>` to retry only failures after a code change |
+| Run a live analysis against a running server | `curl -N -X POST http://localhost:3000/api/analysis -H 'content-type: application/json' -d '{"url":"github.com/<owner>/<repo>"}'` — streams NDJSON, one event per line. Needs `GITHUB_TOKEN`. Added by chunk 06 |
 | Regenerate the snapshot index | `node scripts/build-snapshot-index.mts` — reads `src/lib/snapshots/` and rewrites `src/lib/view/catalog.generated.ts`. Runs automatically as `prebuild`, so `pnpm build` regenerates it |
 
 Regenerating the committed ingest fixture is exactly:
@@ -345,6 +351,43 @@ a follow-up.
   default.Graph is not a constructor`. Use the named exports:
   `import { Graph, layout } from '@dagrejs/dagre'`. Note also that dagre reports a node's
   **centre** while React Flow positions by the **top-left** corner.
+- **A route handler's own guards are specced, and the spec must not reach the network.**
+  `src/app/**/route.ts` is importable by Vitest and its `POST` can be called with a plain
+  `Request`. To exercise the streaming path without a socket, construct the request with
+  `AbortSignal.abort()`: measured on Node 24.13.0 by chunk 06, an already-aborted signal is
+  never dispatched to a listener added afterwards — so a handler must check
+  `signal.aborted` outright — and `fetch` with one rejects `AbortError` before opening a
+  connection.
+- **A string in a module a client component imports ships in the browser bundle, and the
+  credential gate greps for the variable *name*.** Error copy reading "check
+  `GITHUB_TOKEN`" fails `grep -rlE 'ANTHROPIC_API_KEY|GITHUB_TOKEN' .next/static` exactly
+  as a leaked value would. Caught for real 2026-09-20 by chunk 06's own gate 3 in
+  `src/lib/live/protocol.ts`; the hit was in a client chunk under `.next/static/chunks/`.
+- **The `.next/static` `.js` count varies with what the page imports, so never assert a
+  particular size.** Measured 2026-09-20 at the wave-5 preflight: 24 files. Measured again
+  on chunk 06's delivered build: **10**. Both are correct for their build. A client-bundle
+  gate asserts the corpus is **non-empty** and greps it; a gate asserting a count would
+  have failed this chunk for shipping fewer files.
+- **`git ls-files` sees tracked files only**, so a gate that discovers new files by listing
+  them reports `FAIL: no … found` until the work is staged. It fails in the safe direction,
+  unlike a loop over an empty stream, but stage before running it — or union with
+  `git ls-files --others --exclude-standard`.
+- **Do not hand-transcribe a live transcript into a report. Capture each response to its
+  own path and generate the block from those files.** Chunk 06 failed review twice on this:
+  first for pasting `node -e` formatter output as raw wire bytes (three payloads, one of
+  which invented a field that does not exist on the event), then — *in the fix for that* —
+  for hand-copying two captured bodies into a heredoc and pasting the first one twice, so a
+  "cold vs cached" pair read `cached:false` both times while the prose beneath claimed it
+  flipped. The captured files were correct both times; the typing was not. The rules:
+    - one `curl -o <distinct-path>` per response, plus `-w '%{http_code} %{time_total}'`
+      into a `.meta` file, so status and timing are curl's rather than remembered;
+    - for any two responses presented as differing, run `diff a b` and **show its exit
+      status** — exit 0 there is the check that catches a duplicated paste;
+    - emit the report block from the captured files with a script, not by copying them;
+    - a computed view (a key list, a field comparison) is produced by **running** the
+      command shown, never by reformatting the data in another language — chunk 06 also
+      presented Python `json.dumps` output as node's `JSON.stringify`, which spaces its
+      separators differently.
 - **`setState` inside `useEffect` is a lint *error*, not a warning.** `eslint-config-next`
   16.3.5 enables `react-hooks/set-state-in-effect` at error level, so a "read
   `localStorage` after mount and set state" component fails `pnpm lint` outright. Measured
@@ -363,7 +406,9 @@ Where things live, and what belongs where.
 src/
   app/          Next.js App Router. Pages and layouts render; route handlers
                 (app/**/route.ts) are the ONLY place a credential is READ, and the
-                only place a model call may originate.
+                only place a model call may originate. Two exist, both added by chunk
+                06: api/analysis/route.ts (bounded live ingest, streams NDJSON) and
+                api/enrichment/route.ts (one pull request, cache-backed).
   components/
     ui/         shadcn/ui primitives, generated by the CLI. Not hand-edited.
     canvas/     This app's canvas presentation components — the workspace, topology
@@ -382,8 +427,16 @@ src/
                 src/lib/view/derive.ts needs three of them and is imported by client
                 components, and an `ai` import on a component path violates
                 Principle 2.
+                enrichment-cache.ts holds the bounded, per-serving-instance on-demand
+                cache and also imports no `ai` — the producer arrives as a thunk.
     ingest/     GitHub ingest, topology discovery, and the recorded HTTP transcripts
                 under fixtures/.
+    live/       The live-analysis boundary and wire contract. request.ts parses the
+                submitted repository URL and resolves the bounds; protocol.ts is the
+                event contract both the route and the browser import and has no runtime
+                imports at all (both of its imports are `import type`); client.ts is the
+                browser-side caller. Reachable from client components, so nothing here
+                may import `ai` or `@octokit/rest` other than as a type.
     view/       View derivation and the snapshot catalog. catalog.generated.ts is
                 written by scripts/build-snapshot-index.mts — never hand-edited.
     snapshots/  Committed baked snapshots, <owner>-<repo>-<since-date>.json. Captured
