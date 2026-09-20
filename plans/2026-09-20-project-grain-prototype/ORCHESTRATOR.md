@@ -64,6 +64,7 @@ When every chunk is `Merged`, run `/plan:complete`.
 | ---- | ----- | ----- | ------ |
 | 2026-09-20 | `wave_started` | — | Wave 1 — preflight clean: plan branch level with `origin/main`, all chunk-01 reference paths resolve, pnpm 9.15.4 / node v24.13.0 present |
 | 2026-09-20 | `chunk_dispatched` | 01 | Worktree `.worktrees/01-boilerplate` on `feat/project-grain-prototype--boilerplate`; bootstrap is a no-op (no project exists yet) |
+| 2026-09-20 | `designs_received` | — | `design/mid-fi.pdf` (11 pages) + `design/README.md` committed at `887056f` mid-wave-1, with chunks 02/04/05/06 and their rubrics amended to match. Unblocks the stop-and-ask in Plan-Specific Constraints; adds Design Decisions 8 and 9 and amends 3 |
 | 2026-09-20 | `gates_passed` | 01 | Lead re-ran all four at `c391559` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Tests 3 passed (3)`, `pnpm build` compiled, `pnpm typecheck` 0 |
 | 2026-09-20 | `review_passed` | 01 | Iteration 1. Reviewer re-derived gate falsifiability with its own canaries and independently verified the `src/lib/**` arbitration against both sources. Two non-blocking warnings: `project.md` frontmatter still carries `id:`; `shadcn` sits in `dependencies` |
 
