@@ -6,12 +6,16 @@ curated repositories.
 Worktree `/Users/anfal/Projects/hobby_projects/swe-take-home/.worktrees/03-ai-enrichment`,
 branch `feat/project-grain-prototype--ai-enrichment`, base `cb41f75`.
 
+**Updated after review iteration 1**, which failed the chunk on one blocking item: the
+`resolveSteps` collision guard was correct but untested, so a mutant survived. See
+§ Review iteration 1 — mutation evidence. Test count 135 → 140; no production code changed.
+
 ## What changed
 
 | File | Change | Why |
 | ---- | ------ | --- |
 | `src/lib/ai/enrichment.ts` | created | The model-output schema, the `generateObject` call, merge-SHA keying, the bounded payload builder, the fallback path and `enrichSnapshot`. Takes a configured `LanguageModel` as a parameter — reads no credential. |
-| `src/lib/ai/enrichment.test.ts` | created | 28 specs: output-schema bounds, key derivation, success path, SHA resolution, the three failure paths, payload bounding, cache reuse, token accounting, reserved-key rejection. |
+| `src/lib/ai/enrichment.test.ts` | created, then extended at review iteration 1 | 33 specs: output-schema bounds, key derivation, success path, SHA resolution (exact, abbreviated, mistyped tail, **ambiguous prefix, sub-7-character prefix, upper case**), the three failure paths, payload bounding, cache reuse, token accounting, reserved-key rejection. |
 | `src/lib/ai/baked-snapshots.test.ts` | created | Asserts the committed snapshots' properties — schema validity, enrichment coverage, that steps name real commits, that they are mostly real model output, and that none carries a credential. |
 | `scripts/ingest.mts` | edited | Gained `--enrich`, `--model`, `--concurrency`, `--reuse`; `tokenFromEnvironment()` generalised to `secretFromEnvironment(name)`; `parseArgs` learned standalone boolean flags. |
 | `src/lib/snapshots/xyflow-xyflow-2026-06-22.json` | created | Baked output: 100 pull requests, 10 packages, 13 edges, 0 fallbacks. |
@@ -160,7 +164,9 @@ default ceiling of 100 pull requests.
 
 **The lead's density numbers were low by a wide margin, as flagged.** They predicted 13
 merged pull requests for `shadcn-ui/ui` at 90 days; the real ingest returned at least 100
-(it hit the cap). `xyflow/xyflow` likewise hit the cap against a predicted 68. Only
+(it hit the cap). The lead has since re-measured it at **212** merged pull requests in that
+window — the original probe sampled closed PRs sorted by `updated`, which in a repository
+with a large unmerged backlog barely sees recent merges. `xyflow/xyflow` likewise hit the cap against a predicted 68. Only
 `trpc/trpc` landed near its estimate (36 against 36–41). The measurement wins; I kept the
 90-day window and let the `DEFAULT_MAX_PULL_REQUESTS` ceiling of 100 bound the two large
 ones, which is Principle 6 working as intended rather than a truncation to work around.
@@ -260,6 +266,65 @@ escalating costs an env change (`ENRICHMENT_MODEL=claude-opus-5`) and a re-bake.
   `--reuse` pass to retry the records the fixed resolver could now resolve. Every reused
   entry was produced by the identical prompt and an unchanged success path, so no committed
   entry predates the shipped pipeline.
+
+## Review iteration 1 — mutation evidence
+
+The reviewer and the lead both failed the chunk on one blocking item, and both were right:
+`resolveSteps` rejects an ambiguous prefix correctly, but no test constructed a genuine
+collision, so the guarantee was unpinned. The lead demonstrated it by changing
+`matched.length === 1` to `>= 1` and getting a clean 135/135.
+
+**No production code changed.** Five tests were added to `enrichment.test.ts`
+(`Tests 135 passed` → `Tests 140 passed`). Each mutant below was applied to
+`src/lib/ai/enrichment.ts`, the suite run, then the file restored by copying a backup back
+— never `git checkout --` — with `diff -q` confirming the restore.
+
+| # | Mutant | Test that dies | Suite under the mutant |
+| - | ------ | -------------- | ---------------------- |
+| 1 | `matched.length === 1` → `matched.length >= 1` | `degrades when a 7-character prefix names more than one commit of the pull request` | `Test Files 1 failed \| 8 passed (9)` / `Tests 1 failed \| 139 passed (140)` |
+| 2 | `step.commitSha.trim().toLowerCase()` → `step.commitSha.trim()` | `resolves a SHA the model returned in upper case to the commit as the snapshot stores it` **and** `resolves an abbreviated upper-case SHA by prefix, not only an exact one` | `Test Files 1 failed \| 8 passed (9)` / `Tests 2 failed \| 138 passed (140)` |
+| 3 | `prefix.length >= SHA_PREFIX_CHARS ?` → `true ?` | `degrades on a prefix shorter than 7 characters, even when it matches exactly one commit` | `Tests 1 failed \| 139 passed (140)` |
+| 4 | `const SHA_PREFIX_CHARS = 7` → `= 3` | same test as 3 | `Tests 1 failed \| 139 passed (140)` |
+
+Restored tree: `Test Files 9 passed (9) / Tests 140 passed (140)`.
+
+### A third gap I found with the same technique, not in the review
+
+Mutants 3 and 4 are mine. After fixing the two the lead named, I ran the length floor
+itself as a mutant and **it survived** — replacing `prefix.length >= SHA_PREFIX_CHARS` with
+`true`, or weakening the constant from 7 to 3, left the suite green at 140/140. That is the
+same defect class in the same three lines: a three-character prefix is one in 4,096, well
+inside coincidence, and the entire justification for prefix matching is that seven
+characters is not. `degrades on a prefix shorter than 7 characters, even when it matches
+exactly one commit` now pins it, and both mutants die.
+
+The four tests the lead asked for plus this one give `resolveSteps` full mutation coverage
+on every branch: exact match, unique prefix, ambiguous prefix, too-short prefix, no match,
+and case folding.
+
+### A false result I caught mid-run, and did not report as evidence
+
+My first re-verification loop for mutants 1 and 2 reported `Tests 94 passed (94)` — the
+*baseline* count. The shell escaping in that loop had corrupted `enrichment.ts`, so
+`enrichment.test.ts` and `baked-snapshots.test.ts` failed to load and simply did not run,
+while the other seven files passed and the suite exited green. This is exactly the
+"a zero exit does not mean your spec ran" failure `project.md` records. I re-ran both
+mutants explicitly and asserted the **file** count (`Test Files … (9)`) alongside the test
+count; the table above is from that run.
+
+### Gates re-run after the last edit
+
+| Gate | Command | Result |
+| ---- | ------- | ------ |
+| Lint | `pnpm lint` | no output, exit 0 |
+| Tests | `pnpm test` | `Test Files 9 passed (9) / Tests 140 passed (140)` |
+| Build | `pnpm build` | `✓ Compiled successfully in 569ms` / `Finished TypeScript in 2.4s` |
+| Type check | `pnpm typecheck` | no output, exit 0 (run last) |
+| Gate 2 | `bash /tmp/gate2.sh` | `OK …shadcn-ui-ui…: 100 enriched` / `OK …trpc-trpc…: 36 enriched` / `OK …xyflow-xyflow…: 100 enriched` |
+| Gate 3a/b/c | as in § Gates | 30 tracked TS files scanned, no hits; only `.env.example` tracked; 27 files under `src/`, no `process.env` read |
+
+The baked snapshots were not re-baked: no production code changed, so they remain captured
+output of the shipped pipeline.
 
 ## Deviations from the plan
 

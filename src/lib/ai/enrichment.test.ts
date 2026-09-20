@@ -24,6 +24,10 @@ import { enrichmentEntrySchema, snapshotSchema, type PullRequestRecord, type Sna
 const MERGE_SHA = '1f0c2d3e4a5b6c7d8e9f0a1b2c3d4e5f60718293';
 const COMMIT_A = 'aaaaaaaabbbbbbbbccccccccddddddddeeeeeeee';
 const COMMIT_B = 'ffffffff11111111222222223333333344444444';
+/** Two commits of the same pull request sharing a seven-character prefix. */
+const SHARED_PREFIX = '9c0ffee';
+const COMMIT_C = `${SHARED_PREFIX}1111111111111111111111111111111111`.slice(0, 40);
+const COMMIT_D = `${SHARED_PREFIX}2222222222222222222222222222222222`.slice(0, 40);
 
 function pullRequest(overrides: Partial<PullRequestRecord> = {}): PullRequestRecord {
   return {
@@ -201,6 +205,88 @@ describe('enrichPullRequest', () => {
 
     expect(outcome.failed).toBe(false);
     expect(outcome.entry.steps[0].commitSha).toBe(COMMIT_A);
+  });
+
+  it('degrades when a 7-character prefix names more than one commit of the pull request', async () => {
+    // The prefix is only safe because it must identify exactly ONE commit. Two commits of
+    // the same pull request sharing it must degrade, never silently pick whichever sorts
+    // first — a step pointing at the wrong commit is worse than no step chain.
+    const colliding = pullRequest({
+      commits: [
+        { sha: COMMIT_C, message: 'first of the colliding pair' },
+        { sha: COMMIT_D, message: 'second of the colliding pair' },
+      ],
+    });
+    expect(COMMIT_C.slice(0, 7)).toBe(COMMIT_D.slice(0, 7));
+
+    const outcome = await enrichPullRequest({
+      model: modelReturning({ ...goodOutput, steps: [{ commitSha: SHARED_PREFIX, summary: 'ambiguous' }] }),
+      pullRequest: colliding,
+    });
+
+    expect(outcome.failed).toBe(true);
+    expect(isFallbackEnrichment(outcome.entry)).toBe(true);
+    expect(outcome.error).toContain(SHARED_PREFIX);
+    expect(outcome.entry.steps.map((step) => step.commitSha)).not.toContain(COMMIT_C);
+    expect(outcome.entry.steps.map((step) => step.commitSha)).not.toContain(COMMIT_D);
+  });
+
+  it('takes an exact SHA even when another commit shares its 7-character prefix', async () => {
+    const colliding = pullRequest({
+      commits: [
+        { sha: COMMIT_C, message: 'first of the colliding pair' },
+        { sha: COMMIT_D, message: 'second of the colliding pair' },
+      ],
+    });
+
+    const outcome = await enrichPullRequest({
+      model: modelReturning({ ...goodOutput, steps: [{ commitSha: COMMIT_D, summary: 'the exact one' }] }),
+      pullRequest: colliding,
+    });
+
+    expect(outcome.failed).toBe(false);
+    expect(outcome.entry.steps[0].commitSha).toBe(COMMIT_D);
+  });
+
+  it('resolves a SHA the model returned in upper case to the commit as the snapshot stores it', async () => {
+    const outcome = await enrichPullRequest({
+      model: modelReturning({
+        ...goodOutput,
+        steps: [{ commitSha: COMMIT_A.toUpperCase(), summary: 'Added a DB column' }],
+      }),
+      pullRequest: pullRequest(),
+    });
+
+    expect(outcome.failed).toBe(false);
+    expect(outcome.entry.steps[0].commitSha).toBe(COMMIT_A);
+  });
+
+  it('resolves an abbreviated upper-case SHA by prefix, not only an exact one', async () => {
+    const outcome = await enrichPullRequest({
+      model: modelReturning({
+        ...goodOutput,
+        steps: [{ commitSha: COMMIT_A.slice(0, 9).toUpperCase(), summary: 'Added a DB column' }],
+      }),
+      pullRequest: pullRequest(),
+    });
+
+    expect(outcome.failed).toBe(false);
+    expect(outcome.entry.steps[0].commitSha).toBe(COMMIT_A);
+  });
+
+  it('degrades on a prefix shorter than 7 characters, even when it matches exactly one commit', async () => {
+    // "aaa" matches COMMIT_A and nothing else in this pull request, so a resolver without
+    // the length floor would accept it. Three hex characters is one in 4096 — well inside
+    // coincidence — and the whole justification for prefix matching is that seven
+    // characters is not. A short prefix is not evidence, so it degrades.
+    const outcome = await enrichPullRequest({
+      model: modelReturning({ ...goodOutput, steps: [{ commitSha: COMMIT_A.slice(0, 3), summary: 'too short' }] }),
+      pullRequest: pullRequest(),
+    });
+
+    expect(outcome.failed).toBe(true);
+    expect(isFallbackEnrichment(outcome.entry)).toBe(true);
+    expect(outcome.entry.steps.map((step) => step.commitSha)).not.toContain(COMMIT_A);
   });
 
   it('reports the tokens the call consumed', async () => {
