@@ -131,26 +131,26 @@ An empty state for an expanded package with no changes in the range, distinct fr
 
 ### Tasks
 
-- [ ] T001 — write failing spec for package-level derivation — asserts one entry per pull
+- [x] T001 — write failing spec for package-level derivation — asserts one entry per pull
       request reaching the package in the range, with its inclusion reason; fails because the
       function does not exist
-- [ ] T002 — write failing spec for the fallback path — asserts a pull request with absent
+- [x] T002 — write failing spec for the fallback path — asserts a pull request with absent
       or failed enrichment yields a record carrying the pull request title and a flag marking
       it as a fallback; fails because the function does not exist
-- [ ] T003 — write failing spec for step derivation — asserts ordered steps with their files
+- [x] T003 — write failing spec for step derivation — asserts ordered steps with their files
       and line counts, and that the entry-point step for a given package is the first step
       whose files that package owns; fails because the function does not exist
-- [ ] T004 — edit the derivation module from chunk 04 — add package-level and step-level
+- [x] T004 — edit the derivation module from chunk 04 — add package-level and step-level
       derivation
-- [ ] T005 [P] — create the change card component — label, metadata, spanned packages,
+- [x] T005 [P] — create the change card component — label, metadata, spanned packages,
       approach note in full, fallback treatment
-- [ ] T006 [P] — create the step card component
-- [ ] T007 — edit the canvas component — expansion state, level transitions, keyboard
+- [x] T006 [P] — create the step card component
+- [x] T007 — edit the canvas component — expansion state, level transitions, keyboard
       expand/collapse
-- [ ] T008 [P] — create the breadcrumb component
-- [ ] T009 [P] — create the onboarding walkthrough component, with replay
-- [ ] T010 — create the expanded-package empty state
-- [ ] T011 — create `completion-report.md` in this chunk directory
+- [x] T008 [P] — create the breadcrumb component
+- [x] T009 [P] — create the onboarding walkthrough component, with replay
+- [x] T010 — create the expanded-package empty state
+- [x] T011 — create `completion-report.md` in this chunk directory
 
 Judgment calls to explain in the completion report:
 
@@ -236,20 +236,20 @@ not with `git checkout --` — and confirm the gate returns clean.
 
 ## Deliverables
 
-- [ ] `completion-report.md` in this directory, **committed**, written from
+- [x] `completion-report.md` in this directory, **committed**, written from
       `.claude/resources/templates/completion-report.md`
-- [ ] Package-level and step-level derivation, tested directly
-- [ ] Change card and step card components, with an explicit fallback treatment
-- [ ] Breadcrumb navigation and keyboard-reachable expand/collapse
-- [ ] A dismissible, replayable onboarding walkthrough
-- [ ] An empty state for an expanded package with no changes in range
-- [ ] "project.md deltas" section in the completion report, for the lead to apply at the
+- [x] Package-level and step-level derivation, tested directly
+- [x] Change card and step card components, with an explicit fallback treatment
+- [x] Breadcrumb navigation and keyboard-reachable expand/collapse
+- [x] A dismissible, replayable onboarding walkthrough
+- [x] An empty state for an expanded package with no changes in range
+- [x] "project.md deltas" section in the completion report, for the lead to apply at the
       wave boundary
 
 ## Artifacts Checklist
 
-- ☐ New tests for new behavior
-- ☐ Existing tests updated — the derivation module gains functions
-- ☐ Docs / conventions updated for changed behavior
+- ☑ New tests for new behavior
+- ☑ Existing tests updated — the derivation module gains functions
+- ☑ Docs / conventions updated for changed behavior
 - — Generated code re-run (no codegen)
-- ☐ `.claude/resources/project.md` — report deltas; do not edit the file in this chunk
+- ☑ `.claude/resources/project.md` — report deltas; do not edit the file in this chunk
