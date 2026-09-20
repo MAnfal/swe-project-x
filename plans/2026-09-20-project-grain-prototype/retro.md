@@ -532,6 +532,57 @@ cannot come from the committed fixture."* The evidence is three chunks out of th
 enough to stop treating it as a per-chunk implementer failure and start treating it as a hole in
 what we ask for.
 
+#### Framework friction — the session scratchpad is shared, and it silently corrupted a gate run
+
+Chunk 04 reported a gate failing with a message it had never written:
+`FAIL: expected a committed snapshot per curated repository, found 1`. Nothing was wrong with
+chunk 04. Its `gate2.sh` had been **overwritten by chunk 03's gate 2**, which counts curated
+snapshots and asserts enrichment — a different chunk's gate, in a file with the same name.
+
+I confirmed it by listing the directory afterwards. Every agent in this wave writes to one flat
+path, `<session>/scratchpad/`:
+
+```
+09:44  chunk04-gate2.sh   chunk04-gate3.sh   (chunk 04, after renaming defensively)
+09:37  gate2.sh                              (chunk 03's, overwriting chunk 04's 08:55 copy)
+09:42  d2.bak  derive-prev.ts  a.txt  b.txt  (mine, the lead)
+09:31  e.bak                                 (mine)
+09:29  d.bak                                 (mine)
+```
+
+**The lead is implicated too, and more dangerously.** `d.bak` and `d2.bak` are my backups of
+`derive.ts`; `e.bak` is my backup of `enrichment.ts`. My mutation loops restore from those by
+copying them back **into a worktree**. If a subagent had happened to write a file named `d.bak`
+between my backup and my restore, I would have copied another agent's file into chunk 04's
+source tree and then reported a gate result from it. A `git diff` would have caught it here —
+but only because I happened to check, and only because the tree is version-controlled.
+
+**The direction that actually frightens me is the one that did not happen.** Chunk 04 noticed
+because the borrowed gate *failed* with unfamiliar wording. A borrowed gate that **passed**
+would have been recorded as evidence, in a completion report, under a chunk it never tested.
+Every other integrity mechanism in this loop — the reviewer, the lead's re-run, the falsification
+controls — reads the gate's output. None of them checks that the script producing it is the one
+the chunk wrote.
+
+This is not a subagent mistake. `execute.md` tells agents to use the scratchpad and never says
+the scratchpad is shared, so two agents choosing the obvious filename `gate2.sh` is the expected
+outcome of following the instructions, not a deviation from them.
+
+**Proposed framework fix**, recorded for Part 2:
+
+1. `execute.md` § Dispatching subagents should state that the scratchpad is shared across every
+   agent in the session, and require each agent to work in
+   `<scratchpad>/<agent-name>/` — a directory it creates and owns.
+2. The dispatch brief template should carry that instruction, so it arrives with the work rather
+   than depending on the implementer having read the prompt file.
+3. Gate scripts are chunk artifacts and belong in the **worktree**, not the scratchpad — a
+   worktree is per-chunk by construction, and a gate script committed alongside the chunk is
+   reviewable evidence rather than an untracked file that can vanish. This is the fix I would
+   actually make; the first two are mitigations for everything else agents put there.
+
+I have already applied (1) informally by giving iteration 3's reviewer its own subdirectory and
+moving my own backups into `lead-04-i3/`.
+
 #### Lead error — a measurement I reported with a caveat that could not carry its weight
 
 I gave chunk 03's dispatch brief a table of merged-PR density: xyflow 67, shadcn-ui 13, trpc 36
