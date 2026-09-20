@@ -532,6 +532,48 @@ cannot come from the committed fixture."* The evidence is three chunks out of th
 enough to stop treating it as a per-chunk implementer failure and start treating it as a hole in
 what we ask for.
 
+#### Planning defect (mine) — one shared directory, two kinds of file, and a test that spanned both
+
+Chunk 04's merge of the plan branch turned three tests red. One was expected and designed for:
+its generated snapshot index listed one file while the directory now holds four, which is the
+index doing its job.
+
+The other two were not. Chunk 03's `src/lib/ai/baked-snapshots.test.ts` calls `readdirSync`
+over `src/lib/snapshots/` and asserts that **every** file there carries enrichment for every
+pull request. Chunk 04's snapshot deliberately carries none.
+
+Neither chunk is wrong, and neither could have seen it. Chunk 03's invariant was true of
+everything chunk 03 baked. Chunk 04's un-enriched snapshot is intended — I told it to commit
+one there precisely so the picker has content and the enrichment-absent render path is
+exercised by real committed data rather than only by a spec. Each chunk's tests passed against
+its own base; the conflict exists only in the union, which is exactly the class of defect a
+wave boundary is for.
+
+**The error is mine and it is more specific than "parallel chunks conflicted."** I made the
+one-directory call deliberately and journalled the reasoning above — sharing it is what keeps
+chunk 04 independently demoable, because a picker that discovers nothing at the moment chunk 04
+merges breaks the US1 checkpoint. I even wrote down the consequence: *"after both merge the
+picker lists four snapshots, one of them un-enriched — that is intended."*
+
+What I did not anticipate is that putting two **kinds** of file in one directory invites a test
+that quantifies over the directory. I reasoned about the *files* colliding — and correctly
+prevented that with window-qualified names and an explicit instruction to each chunk not to
+touch the other's path. I did not reason about a **predicate** colliding. `readdirSync` plus
+`it.each` is the obvious way to write "every committed snapshot is well-formed", and it is only
+wrong because the directory holds two kinds of thing that look alike.
+
+**The generalization worth keeping**: when two parallel chunks write to one directory, the
+question is not only "can they collide on a filename" but "does either one's *definition* of
+what lives here exclude what the other writes?" If the answer is yes, the directory holds two
+kinds and the distinction has to be visible in the data — not in a naming convention, and not
+in a whitelist that rots.
+
+The fix I asked for makes the invariant the true one rather than scoping the test to a curated
+list: a snapshot with no `enrichment` key is an un-enriched fixture and only its shape is
+asserted; a snapshot **with** one must carry a complete one, because **partial** enrichment is
+the actual bug. That is stronger than what it replaces — it catches a future bake that silently
+enriched nothing, on a repository nobody has added yet. A whitelist would not have.
+
 #### Framework friction — the session scratchpad is shared, and it silently corrupted a gate run
 
 Chunk 04 reported a gate failing with a message it had never written:
