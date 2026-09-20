@@ -128,3 +128,21 @@ the expected state.
 Only rules unique to *this* plan that aren't already in the prompts.
 
 - <constraint>
+
+**If a constraint defers `project.md` edits to the lead**, name **which sections** are
+contested rather than deferring the whole file. The reason to batch is a merge conflict
+between two chunks in one parallel wave, and that risk is not uniform: Stack and Commands
+are single shared blocks two chunks really can collide on; **Layout, Convention Map and
+Conventions are append-or-amend-in-place and rarely collide**, so chunks edit those
+directly in-chunk per `project.md`'s own standing rule.
+
+Deferring everything trades a merge conflict for a **transcription step**, and
+transcription is where the quieter drift lives: the lead applies a list of bullets from a
+report a chunk later, without the directory open, and an insertion silently reparents the
+paragraph below it. An implementer editing the section it just changed has the context the
+lead no longer has.
+
+**A one-time instruction gets discharged against whichever chunk is in front of you.** A
+constraint phrased as "do X when Y merges" for a set of chunks will be done for one of
+them. If it applies per-chunk or per-wave, say so and give it a checkable home in the
+preflight (see `prompts/preflight.md` § 4.5), not just a line here.

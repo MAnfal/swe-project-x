@@ -85,8 +85,15 @@ that has none:
 | Type check / lint | the diagnostic code and the file it fired on |
 | Build / script | the non-zero exit status and the error line |
 
-Two shapes to watch for:
+Three shapes to watch for:
 
+- **A failure that is not about the chunk.** A non-zero exit on base proves the gate *can*
+  fail; it does not prove it fails **because the work is missing**. Run the gate on base
+  and on the finished tree and compare the **error text**, not the exit status. Identical
+  output both times means the command is broken, not the tree — the gate is vacuous in the
+  direction the exit code cannot show. Most common cause: a malformed invocation the tool
+  rejects before it ever reaches the project (`pnpm test --run` exits non-zero with
+  `ERROR Unknown option: 'run'` on any tree, with or without a `package.json`).
 - **An OR pattern whose second alternative already matches.** `grep -E 'a|b'` returning
   hits proves nothing about *which* one matched. Verify each needle separately; if one
   branch matches the base tree, the gate is permanently vacuous.

@@ -18,12 +18,19 @@ reference to a routing table tells someone where to start looking, not what rule
 
 ## Service and module design
 
+`patterns/service-design.md` assumes a **dependency-injection container** — its mandatory
+section requires an interface in `contracts/`, an injectable class, and a provider token.
+Route to it only when the project actually has one. A module of standalone functions over
+plain objects is not a service; sending it here produces exactly the abstraction a plan
+that chose plain functions rejected by name.
+
 | I need to… | Read |
 | ---------- | ---- |
-| Design a new service or module with a public API | `patterns/service-design.md` |
-| Decide where an interface lives | `patterns/service-design.md` |
-| Make an implementation substitutable | `patterns/service-design.md` |
+| Design a service in a project with a DI container | `patterns/service-design.md` |
+| Decide where an interface lives, **given more than one implementation exists** | `patterns/service-design.md` |
+| Make an implementation substitutable for a second real implementation | `patterns/service-design.md` |
 | Decide what a method should return | `patterns/service-design.md` |
+| Design a module of standalone functions, with no container and one implementation | — nothing here applies; follow the project's own Convention Map row |
 
 ## Pipelines and orchestration
 

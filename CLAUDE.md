@@ -1,6 +1,10 @@
 # Project
 
-<One or two sentences: what this project is and who it's for. Replace this.>
+**Grain** gives a codeowner a time-scrubbable map of their domain: an infinite canvas of a
+monorepo's packages, a slider over the repository's history, and three levels of disclosure
+— which packages changed, what each change was and how it was approached, and the ordered
+steps that produced it. It reports; it never blocks, gates, or judges. Deployed prototype,
+built for the owner of a package who has been away from the code.
 
 ## How work happens here
 
@@ -46,9 +50,11 @@ the copy a session happens to read first wins.
 
 <!-- One line per completed plan, newest first. Added by /plan:complete. -->
 
-- **Stack undecided.** `project.md` is reset to placeholders. Once the stack is chosen,
-  chunk 01 of the first plan writes it — see `.claude/README.md` § "If you don't know the
-  stack yet".
+- **Project Grain prototype delivered** 2026-09-20 (`plans/completed/2026-09-20-project-grain-prototype/`):
+  six chunks, US1 and US2 both demoed. `project.md` is written and current — stack,
+  commands, Principles, Convention Map and Layout all live there, not here. The retro's 21
+  framework updates were applied in the same close-out; read its Part 2 before planning
+  the next one.
 - **Knowledge layer added** 2026-09-19: `.claude/resources/bibles/` holds the engineering
   and prompt-authoring standards the loop cites. Brainstorm, planning, rubric generation,
   implementation and review all route through it.

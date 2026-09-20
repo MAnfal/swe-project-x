@@ -36,6 +36,18 @@ judgments, not givens — test them." An unflagged lead judgment reads as settle
 and gets inherited rather than checked. Everything not on that list is context; everything
 on it is in scope for falsification.
 
+### Validate any instrument you build during the review
+
+If the review produces a tool — a mutation harness, a canary script, a diff filter, a
+counting loop — validate it before trusting a single result from it. Run it once against
+an **unmutated** tree and confirm it reports clean, and once against a mutation you are
+certain is caught. An instrument that reports failure unconditionally is indistinguishable
+from one reporting that everything is covered, and it fails in the direction of approving.
+
+`prompts/gates.md` requires a negative control for every gate an *implementer* writes. The
+same obligation binds a tool the reviewer builds; nothing downstream re-checks it, because
+the review is the last independent pass.
+
 ## Step 2 — PASS
 
 Record the iteration count, write the journal entry, proceed to delivery.

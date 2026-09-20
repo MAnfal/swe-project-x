@@ -37,7 +37,16 @@ before the next one starts, so the ordering that stacking bought is already ther
 The lead creates the worktree — not the Agent tool's isolation flag — because the base
 branch and the bootstrap both have to be right *before* the implementer starts.
 
+**Commit and push your plan amendments first.** `git worktree add` materializes the
+branch's **commit**, not your working tree — an uncommitted preflight fix is invisible to
+the implementer, and `git fetch` does not help, because the edits never left your
+checkout. Confirm with `git status --short` before running the command below. Preflight's
+whole job is producing plan amendments and worktree creation is the next step, so the
+moment you are most likely to hold uncommitted plan edits is the moment before the one
+command that cannot see them.
+
 ```bash
+git status --short          # must be clean of plan edits
 git fetch origin "$PLAN_BRANCH"
 git worktree add ".worktrees/<chunk-name>" -b "<type>/<plan-name>--<chunk-name>" "$PLAN_BRANCH"
 ```

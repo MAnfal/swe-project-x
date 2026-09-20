@@ -25,8 +25,17 @@ often as it passes a violation.
 - [ ] New behavior has tests covering the happy path, the error path, and the edges
 - [ ] `completion-report.md` exists and is committed — without it the evidence below
       cannot be graded
-- [ ] The tests were observed failing before the implementation existed, and the report
-      shows the red run — not just the green one
+- [ ] The tests were observed failing before the implementation existed **for the right
+      reason** — the report distinguishes a suite that failed to *import* (which proves
+      only that the module was absent) from an assertion that failed against a *wrong
+      value*. `0 tests collected` is an import error wearing a red run's clothes
+- [ ] For every guarantee the chunk's plan calls a contract, the report shows that
+      assertion failing against a **plausible wrong implementation** — one deliberate
+      mutation per contract, not a mutation-testing pass
+- [ ] For each defensive branch — a guard, a boundary, a clamp — a test exists whose input
+      **cannot come from the committed fixture**. A real fixture contains only the cases
+      that repository happened to produce; the guard for the case it didn't produce has
+      nothing holding it
 - [ ] Any abstraction introduced is justified in the plan's Design Decisions; no layer,
       base class, or indirection appears that the chunk didn't need
 - [ ] No principle in `.claude/resources/project.md` is violated without a recorded
