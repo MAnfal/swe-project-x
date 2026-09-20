@@ -1,0 +1,814 @@
+{
+  "metadata": {
+    "analyzedAt": "2026-09-20T15:44:25.902Z",
+    "packageCount": 10,
+    "pullRequestCount": 6,
+    "repository": {
+      "name": "xyflow",
+      "owner": "xyflow"
+    },
+    "window": {
+      "since": "2026-08-31T00:00:00Z",
+      "until": "2026-09-02T00:00:00Z"
+    }
+  },
+  "packages": {
+    "edges": [
+      {
+        "from": "@xyflow/react",
+        "kind": "devDependencies",
+        "to": "@xyflow/eslint-config"
+      },
+      {
+        "from": "@xyflow/react",
+        "kind": "devDependencies",
+        "to": "@xyflow/rollup-config"
+      },
+      {
+        "from": "@xyflow/react",
+        "kind": "dependencies",
+        "to": "@xyflow/system"
+      },
+      {
+        "from": "@xyflow/react",
+        "kind": "devDependencies",
+        "to": "@xyflow/tsconfig"
+      },
+      {
+        "from": "@xyflow/svelte",
+        "kind": "dependencies",
+        "to": "@xyflow/system"
+      },
+      {
+        "from": "@xyflow/system",
+        "kind": "devDependencies",
+        "to": "@xyflow/eslint-config"
+      },
+      {
+        "from": "@xyflow/system",
+        "kind": "devDependencies",
+        "to": "@xyflow/rollup-config"
+      },
+      {
+        "from": "@xyflow/system",
+        "kind": "devDependencies",
+        "to": "@xyflow/tsconfig"
+      },
+      {
+        "from": "astro-examples",
+        "kind": "dependencies",
+        "to": "@xyflow/react"
+      },
+      {
+        "from": "astro-examples",
+        "kind": "dependencies",
+        "to": "@xyflow/svelte"
+      },
+      {
+        "from": "react-examples",
+        "kind": "dependencies",
+        "to": "@xyflow/react"
+      },
+      {
+        "from": "react-examples",
+        "kind": "dependencies",
+        "to": "@xyflow/system"
+      },
+      {
+        "from": "svelte-examples",
+        "kind": "dependencies",
+        "to": "@xyflow/svelte"
+      }
+    ],
+    "nodes": [
+      {
+        "manifestPath": "tooling/eslint-config/package.json",
+        "name": "@xyflow/eslint-config",
+        "path": "tooling/eslint-config"
+      },
+      {
+        "manifestPath": "packages/react/package.json",
+        "name": "@xyflow/react",
+        "path": "packages/react"
+      },
+      {
+        "manifestPath": "tooling/rollup-config/package.json",
+        "name": "@xyflow/rollup-config",
+        "path": "tooling/rollup-config"
+      },
+      {
+        "manifestPath": "packages/svelte/package.json",
+        "name": "@xyflow/svelte",
+        "path": "packages/svelte"
+      },
+      {
+        "manifestPath": "packages/system/package.json",
+        "name": "@xyflow/system",
+        "path": "packages/system"
+      },
+      {
+        "manifestPath": "tooling/tsconfig/package.json",
+        "name": "@xyflow/tsconfig",
+        "path": "tooling/tsconfig"
+      },
+      {
+        "manifestPath": "examples/astro-xyflow/package.json",
+        "name": "astro-examples",
+        "path": "examples/astro-xyflow"
+      },
+      {
+        "manifestPath": "tests/playwright/package.json",
+        "name": "playwright",
+        "path": "tests/playwright"
+      },
+      {
+        "manifestPath": "examples/react/package.json",
+        "name": "react-examples",
+        "path": "examples/react"
+      },
+      {
+        "manifestPath": "examples/svelte/package.json",
+        "name": "svelte-examples",
+        "path": "examples/svelte"
+      }
+    ]
+  },
+  "pullRequests": [
+    {
+      "author": "moklick",
+      "body": "This PR was opened by the [Changesets release](https://github.com/changesets/action) GitHub action. When you're ready to do a release, you can merge this and the packages will be published to npm automatically. If you're not ready to do a release yet, that's fine, whenever you add more changesets to main, this PR will be updated.\n\n\n# Releases\n## @xyflow/react@12.11.6\n\n### Patch Changes\n\n-   [#5994](https://github.com/xyflow/xyflow/pull/5994) [`2350158`](https://github.com/xyflow/xyflow/commit/2350158ba91e82823477b0a1160c0319e79d6172) - Reset all properties in provider store when unmounting flow\n\n\n-   [#5997](https://github.com/xyflow/xyflow/pull/5997) [`0117cc9`](https://github.com/xyflow/xyflow/commit/0117cc9447b082369f238243d15327a5ac9c3dc3) - Prevent attribution warning when pane is not rendered either\n\n-   Updated dependencies \\[[`0117cc9`](https://github.com/xyflow/xyflow/commit/0117cc9447b082369f238243d15327a5ac9c3dc3)]:\n    -   @xyflow/system@0.0.82\n\n## @xyflow/svelte@1.6.6\n\n### Patch Changes\n\n-   [#5994](https://github.com/xyflow/xyflow/pull/5994) [`17d3792`](https://github.com/xyflow/xyflow/commit/17d3792673d0e6b3df26b4739c287329fd74df16) - Reset all properties in provider store when unmounting flow\n\n\n-   [#5977](https://github.com/xyflow/xyflow/pull/5977) [`b7d99a5`](https://github.com/xyflow/xyflow/commit/b7d99a53ff4c60435ce93a17277811db34232588) - Hide edge if connected node is hidden\n\n\n-   [#5997](https://github.com/xyflow/xyflow/pull/5997) [`0117cc9`](https://github.com/xyflow/xyflow/commit/0117cc9447b082369f238243d15327a5ac9c3dc3) - Prevent attribution warning when pane is not rendered either\n\n-   Updated dependencies \\[[`0117cc9`](https://github.com/xyflow/xyflow/commit/0117cc9447b082369f238243d15327a5ac9c3dc3)]:\n    -   @xyflow/system@0.0.82\n\n## @xyflow/system@0.0.82\n\n### Patch Changes\n\n-   [#5997](https://github.com/xyflow/xyflow/pull/5997) [`0117cc9`](https://github.com/xyflow/xyflow/commit/0117cc9447b082369f238243d15327a5ac9c3dc3) - Prevent attribution warning when pane is not rendered either\n",
+      "commits": [
+        {
+          "message": "chore(packages): bump",
+          "sha": "9fd41fd4fc18a22b7c461da8888b2ab264a00a29"
+        }
+      ],
+      "directPackages": [
+        "@xyflow/react",
+        "@xyflow/svelte",
+        "@xyflow/system"
+      ],
+      "files": [
+        {
+          "additions": 0,
+          "deletions": 5,
+          "package": null,
+          "path": ".changeset/dirty-areas-leave.md",
+          "status": "removed"
+        },
+        {
+          "additions": 0,
+          "deletions": 6,
+          "package": null,
+          "path": ".changeset/good-stamps-melt.md",
+          "status": "removed"
+        },
+        {
+          "additions": 0,
+          "deletions": 5,
+          "package": null,
+          "path": ".changeset/strict-cooks-hope.md",
+          "status": "removed"
+        },
+        {
+          "additions": 0,
+          "deletions": 8,
+          "package": null,
+          "path": ".changeset/tough-chefs-shave.md",
+          "status": "removed"
+        },
+        {
+          "additions": 14,
+          "deletions": 0,
+          "package": "@xyflow/react",
+          "path": "packages/react/CHANGELOG.md",
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "package": "@xyflow/react",
+          "path": "packages/react/package.json",
+          "status": "modified"
+        },
+        {
+          "additions": 18,
+          "deletions": 0,
+          "package": "@xyflow/svelte",
+          "path": "packages/svelte/CHANGELOG.md",
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "package": "@xyflow/svelte",
+          "path": "packages/svelte/package.json",
+          "status": "modified"
+        },
+        {
+          "additions": 7,
+          "deletions": 0,
+          "package": "@xyflow/system",
+          "path": "packages/system/CHANGELOG.md",
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "package": "@xyflow/system",
+          "path": "packages/system/package.json",
+          "status": "modified"
+        }
+      ],
+      "indirectPackages": [
+        {
+          "package": "astro-examples",
+          "path": [
+            "astro-examples",
+            "@xyflow/react"
+          ],
+          "through": "@xyflow/react"
+        },
+        {
+          "package": "react-examples",
+          "path": [
+            "react-examples",
+            "@xyflow/react"
+          ],
+          "through": "@xyflow/react"
+        },
+        {
+          "package": "svelte-examples",
+          "path": [
+            "svelte-examples",
+            "@xyflow/svelte"
+          ],
+          "through": "@xyflow/svelte"
+        }
+      ],
+      "mergeCommitSha": "0a1f9575b25679f2880175de8d3eae21aedde921",
+      "mergedAt": "2026-09-01T12:02:55Z",
+      "number": 5992,
+      "title": "Release packages",
+      "url": "https://github.com/xyflow/xyflow/pull/5992"
+    },
+    {
+      "author": "peterkogo",
+      "body": null,
+      "commits": [
+        {
+          "message": "only display warning if pane is not visible as well",
+          "sha": "94701726c5a11eee01776e85bcd670c65618b3ed"
+        },
+        {
+          "message": "chore(changeset)",
+          "sha": "0117cc9447b082369f238243d15327a5ac9c3dc3"
+        }
+      ],
+      "directPackages": [
+        "@xyflow/svelte",
+        "@xyflow/system"
+      ],
+      "files": [
+        {
+          "additions": 8,
+          "deletions": 0,
+          "package": null,
+          "path": ".changeset/tough-chefs-shave.md",
+          "status": "added"
+        },
+        {
+          "additions": 5,
+          "deletions": 7,
+          "package": "@xyflow/svelte",
+          "path": "packages/svelte/src/lib/components/Attribution/Attribution.svelte",
+          "status": "modified"
+        },
+        {
+          "additions": 2,
+          "deletions": 2,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/utils/attribution.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 18,
+          "deletions": 5,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/utils/general.ts",
+          "status": "modified"
+        }
+      ],
+      "indirectPackages": [
+        {
+          "package": "@xyflow/react",
+          "path": [
+            "@xyflow/react",
+            "@xyflow/system"
+          ],
+          "through": "@xyflow/system"
+        },
+        {
+          "package": "astro-examples",
+          "path": [
+            "astro-examples",
+            "@xyflow/svelte"
+          ],
+          "through": "@xyflow/svelte"
+        },
+        {
+          "package": "react-examples",
+          "path": [
+            "react-examples",
+            "@xyflow/system"
+          ],
+          "through": "@xyflow/system"
+        },
+        {
+          "package": "svelte-examples",
+          "path": [
+            "svelte-examples",
+            "@xyflow/svelte"
+          ],
+          "through": "@xyflow/svelte"
+        }
+      ],
+      "mergeCommitSha": "c711ad9e9c9554ff9b47b87e1ee963e819260864",
+      "mergedAt": "2026-09-01T11:53:10Z",
+      "number": 5997,
+      "title": "only display warning if pane is not visible as well",
+      "url": "https://github.com/xyflow/xyflow/pull/5997"
+    },
+    {
+      "author": "moklick",
+      "body": "closes  #5991",
+      "commits": [
+        {
+          "message": "fix(react/store): reset functions #5991",
+          "sha": "2acefb5b4f3730b28f0480a107a887d35ed92b83"
+        },
+        {
+          "message": "chore(changeset): add",
+          "sha": "2350158ba91e82823477b0a1160c0319e79d6172"
+        },
+        {
+          "message": "fix(react/store): reset defaultEdgeOptions",
+          "sha": "19f9c2ad98ac71e837d467edf66fea628fd87c55"
+        },
+        {
+          "message": "Reset all properties in Svelte Flow store when unmounting the flow",
+          "sha": "17d3792673d0e6b3df26b4739c287329fd74df16"
+        }
+      ],
+      "directPackages": [
+        "@xyflow/react",
+        "@xyflow/svelte",
+        "svelte-examples"
+      ],
+      "files": [
+        {
+          "additions": 5,
+          "deletions": 0,
+          "package": null,
+          "path": ".changeset/dirty-areas-leave.md",
+          "status": "added"
+        },
+        {
+          "additions": 5,
+          "deletions": 0,
+          "package": null,
+          "path": ".changeset/strict-cooks-hope.md",
+          "status": "added"
+        },
+        {
+          "additions": 2,
+          "deletions": 1,
+          "package": "svelte-examples",
+          "path": "examples/svelte/src/components/Header/Header.svelte",
+          "status": "modified"
+        },
+        {
+          "additions": 9,
+          "deletions": 0,
+          "package": "svelte-examples",
+          "path": "examples/svelte/src/routes/examples/unmount/+page.svelte",
+          "status": "added"
+        },
+        {
+          "additions": 109,
+          "deletions": 0,
+          "package": "svelte-examples",
+          "path": "examples/svelte/src/routes/examples/unmount/Flow.svelte",
+          "status": "added"
+        },
+        {
+          "additions": 29,
+          "deletions": 0,
+          "package": "@xyflow/react",
+          "path": "packages/react/src/store/initialState.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 24,
+          "deletions": 24,
+          "package": "@xyflow/react",
+          "path": "packages/react/src/types/store.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 9,
+          "deletions": 1,
+          "package": "@xyflow/svelte",
+          "path": "packages/svelte/src/lib/container/SvelteFlow/SvelteFlow.svelte",
+          "status": "modified"
+        }
+      ],
+      "indirectPackages": [
+        {
+          "package": "astro-examples",
+          "path": [
+            "astro-examples",
+            "@xyflow/react"
+          ],
+          "through": "@xyflow/react"
+        },
+        {
+          "package": "react-examples",
+          "path": [
+            "react-examples",
+            "@xyflow/react"
+          ],
+          "through": "@xyflow/react"
+        }
+      ],
+      "mergeCommitSha": "2903b14fa8cdcc4695aed20b38dcb20fe5d70540",
+      "mergedAt": "2026-08-31T21:23:02Z",
+      "number": 5994,
+      "title": "fix(store): reset functions",
+      "url": "https://github.com/xyflow/xyflow/pull/5994"
+    },
+    {
+      "author": "moklick",
+      "body": "It seems that edges are still rendered even if a connected node is hidden.",
+      "commits": [
+        {
+          "message": "fix(svelte): hide edge if connected node is hidden",
+          "sha": "bb40f2dd0a0e4efa52fecdab20efc32e1b5ad62b"
+        },
+        {
+          "message": "chore(changeset): add",
+          "sha": "b7d99a53ff4c60435ce93a17277811db34232588"
+        }
+      ],
+      "directPackages": [
+        "@xyflow/svelte"
+      ],
+      "files": [
+        {
+          "additions": 6,
+          "deletions": 0,
+          "package": null,
+          "path": ".changeset/good-stamps-melt.md",
+          "status": "added"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "package": "@xyflow/svelte",
+          "path": "packages/svelte/src/lib/store/visibleElements.ts",
+          "status": "modified"
+        }
+      ],
+      "indirectPackages": [
+        {
+          "package": "astro-examples",
+          "path": [
+            "astro-examples",
+            "@xyflow/svelte"
+          ],
+          "through": "@xyflow/svelte"
+        },
+        {
+          "package": "svelte-examples",
+          "path": [
+            "svelte-examples",
+            "@xyflow/svelte"
+          ],
+          "through": "@xyflow/svelte"
+        }
+      ],
+      "mergeCommitSha": "4c40498e8f4e54a5255cf7f54471ead0c44c0f2c",
+      "mergedAt": "2026-08-31T12:21:34Z",
+      "number": 5977,
+      "title": "fix(svelte): hide edge if connected node is hidden",
+      "url": "https://github.com/xyflow/xyflow/pull/5977"
+    },
+    {
+      "author": "moklick",
+      "body": "This PR renames the Handle type to HandleBounds. We could also drop `toHandleBounds`, because this is already done in `adoptUserNodes`. ",
+      "commits": [
+        {
+          "message": "refactor(types): rename Handle to HandleBounds",
+          "sha": "615c5f6a41340b6474e5a9a8b415ca62233e1ee8"
+        },
+        {
+          "message": "adjust comment",
+          "sha": "9a066de4715636be13b6234205e92a43734ea521"
+        }
+      ],
+      "directPackages": [
+        "@xyflow/react",
+        "@xyflow/svelte",
+        "@xyflow/system"
+      ],
+      "files": [
+        {
+          "additions": 9,
+          "deletions": 0,
+          "package": null,
+          "path": ".changeset/rename-handle-bounds.md",
+          "status": "added"
+        },
+        {
+          "additions": 1,
+          "deletions": 4,
+          "package": "@xyflow/react",
+          "path": "packages/react/src/index.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 3,
+          "deletions": 3,
+          "package": "@xyflow/react",
+          "path": "packages/react/src/types/edges.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 2,
+          "deletions": 2,
+          "package": "@xyflow/react",
+          "path": "packages/react/src/types/store.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 0,
+          "package": "@xyflow/svelte",
+          "path": "packages/svelte/src/lib/index.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 2,
+          "deletions": 2,
+          "package": "@xyflow/svelte",
+          "path": "packages/svelte/src/lib/store/initial-store.svelte.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 3,
+          "deletions": 3,
+          "package": "@xyflow/svelte",
+          "path": "packages/svelte/src/lib/types/general.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 3,
+          "deletions": 3,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/types/general.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 6,
+          "deletions": 1,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/types/handles.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 15,
+          "deletions": 6,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/types/nodes.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 3,
+          "deletions": 3,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/utils/dom.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 5,
+          "deletions": 31,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/utils/edges/positions.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 3,
+          "deletions": 3,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/utils/store.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 4,
+          "deletions": 4,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/xyhandle/types.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 4,
+          "deletions": 4,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/xyhandle/utils.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 3,
+          "deletions": 3,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/xyhandle/XYHandle.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 2,
+          "deletions": 2,
+          "package": null,
+          "path": "packages/vue/src/components/ConnectionLine/index.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 2,
+          "deletions": 0,
+          "package": null,
+          "path": "packages/vue/src/composables/useHandle.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 6,
+          "package": null,
+          "path": "packages/vue/src/index.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 3,
+          "deletions": 3,
+          "package": null,
+          "path": "packages/vue/src/types/connection.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 3,
+          "package": null,
+          "path": "packages/vue/src/types/handle.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 2,
+          "deletions": 2,
+          "package": null,
+          "path": "packages/vue/src/types/store.ts",
+          "status": "modified"
+        },
+        {
+          "additions": 2,
+          "deletions": 2,
+          "package": null,
+          "path": "packages/vue/src/utils/edge.ts",
+          "status": "modified"
+        }
+      ],
+      "indirectPackages": [
+        {
+          "package": "astro-examples",
+          "path": [
+            "astro-examples",
+            "@xyflow/react"
+          ],
+          "through": "@xyflow/react"
+        },
+        {
+          "package": "react-examples",
+          "path": [
+            "react-examples",
+            "@xyflow/react"
+          ],
+          "through": "@xyflow/react"
+        },
+        {
+          "package": "svelte-examples",
+          "path": [
+            "svelte-examples",
+            "@xyflow/svelte"
+          ],
+          "through": "@xyflow/svelte"
+        }
+      ],
+      "mergeCommitSha": "7b8d854ae6a2310960a51e1759d801b24f44ce30",
+      "mergedAt": "2026-08-31T09:36:49Z",
+      "number": 5987,
+      "title": "refactor(types): rename Handle to HandleBounds",
+      "url": "https://github.com/xyflow/xyflow/pull/5987"
+    },
+    {
+      "author": "moklick",
+      "body": null,
+      "commits": [
+        {
+          "message": "fix(system): prevent jumping of nodes when individual origin is set",
+          "sha": "4798afc46124a00eea8dd942d63ff2f0f3358047"
+        },
+        {
+          "message": "chore(changeset): add",
+          "sha": "bf2762661eb8f39168be89727951819ee72a8317"
+        },
+        {
+          "message": "Merge branch 'renovate' into fix/node-origin-handling",
+          "sha": "dfcedf20a025eb47ebe96069e03341a6bb91ff69"
+        },
+        {
+          "message": "modify comment",
+          "sha": "c000b3fefd4c6fef208fce1709e9a02e4f205cb6"
+        },
+        {
+          "message": "revert change to subflow example",
+          "sha": "9ff0e71ef76a84b6535f1dc3fb6bc4322f3e1e53"
+        }
+      ],
+      "directPackages": [
+        "@xyflow/system"
+      ],
+      "files": [
+        {
+          "additions": 8,
+          "deletions": 0,
+          "package": null,
+          "path": ".changeset/proud-feet-write.md",
+          "status": "added"
+        },
+        {
+          "additions": 7,
+          "deletions": 2,
+          "package": "@xyflow/system",
+          "path": "packages/system/src/utils/store.ts",
+          "status": "modified"
+        }
+      ],
+      "indirectPackages": [
+        {
+          "package": "@xyflow/react",
+          "path": [
+            "@xyflow/react",
+            "@xyflow/system"
+          ],
+          "through": "@xyflow/system"
+        },
+        {
+          "package": "@xyflow/svelte",
+          "path": [
+            "@xyflow/svelte",
+            "@xyflow/system"
+          ],
+          "through": "@xyflow/system"
+        },
+        {
+          "package": "astro-examples",
+          "path": [
+            "astro-examples",
+            "@xyflow/react",
+            "@xyflow/system"
+          ],
+          "through": "@xyflow/system"
+        },
+        {
+          "package": "react-examples",
+          "path": [
+            "react-examples",
+            "@xyflow/system"
+          ],
+          "through": "@xyflow/system"
+        },
+        {
+          "package": "svelte-examples",
+          "path": [
+            "svelte-examples",
+            "@xyflow/svelte",
+            "@xyflow/system"
+          ],
+          "through": "@xyflow/system"
+        }
+      ],
+      "mergeCommitSha": "549b6def0949989efcd934b4b5c9c8416c315118",
+      "mergedAt": "2026-08-31T09:22:57Z",
+      "number": 5989,
+      "title": "fix(system): prevent jumping of nodes when individual origin is set",
+      "url": "https://github.com/xyflow/xyflow/pull/5989"
+    }
+  ]
+}
