@@ -6,7 +6,7 @@ base: feat/plan--project-grain-prototype
 execution: sequential
 depends: [04]
 file-limit-waived: true
-file-limit-reason: "Three specs plus the derivation extension, then five presentation components (two node types, breadcrumb, walkthrough, empty state) that together make US1 demoable. Splitting would leave a level half-rendered."
+file-limit-reason: "Three specs plus the derivation extension, then five presentation components (change card, step card, breadcrumb, walkthrough, empty state) that together make US1 demoable. Splitting would leave a level half-rendered."
 ---
 
 # Chunk 05 — Canvas: change clusters and step chains
@@ -17,12 +17,14 @@ Chunk 04 answers "was my domain touched". This chunk answers the two questions t
 **what were those changes**, and **how were they built** — Levels 2 and 3 of the progressive
 disclosure model, plus the navigation that makes moving between levels legible.
 
-Level 2 is one node per pull request that reached the expanded package in the selected
-window, directly or through a dependency. Each node carries the enrichment from chunk 03:
-the label, the pull request's own metadata, the packages it spanned, and the one-line
-`approach` note. **The approach note is the highest-value content on the screen** — it is
-the only thing that says how the work was done rather than what changed — so it must be
-readable at a glance rather than buried behind another interaction.
+Level 2 is one **card** per pull request that reached the expanded package in the selected
+window, directly or through a dependency — a card list anchored to the package, not a graph
+of pull-request nodes (design page 5; Design Decision 8). Each card carries the enrichment
+from chunk 03: the label, the pull request's own metadata, the packages it spanned, and the
+one-line `approach` note. **The approach note is the highest-value content on the screen** —
+it is the only thing that says how the work was done rather than what changed — so it must
+be readable at a glance rather than buried behind another interaction, and the card exists
+to give that sentence room.
 
 Level 3 is the ordered step chain that produced one change, rendered left to right, each
 step naming the files involved.
@@ -51,14 +53,16 @@ silently diverging. Do not implement a screen you have not looked at.
 
 ## Acceptance Criteria
 
-- Given an active package in the selected window, When it is expanded, Then exactly one node
-  appears per pull request that reached it in that window, directly or indirectly.
-- Given a change node, When it is read, Then it shows the label, the pull request number,
-  the author, the merge date, the packages the change spanned, and the approach note.
-- Given a change whose enrichment failed or is absent, When its node renders, Then it shows
+- Given an active package in the selected window, When it is expanded, Then exactly one
+  change card appears per pull request that reached it in that window, directly or
+  indirectly, laid out as a list anchored to the package card rather than as a graph.
+- Given a change card, When it is read, Then it shows the label, the pull request number,
+  the author, the merge date, the packages the change spanned, and the approach note — the
+  approach note rendered in full, never truncated to a chip.
+- Given a change whose enrichment failed or is absent, When its card renders, Then it shows
   the pull request's own title and is distinguishable from a change with a real label —
-  never a blank node.
-- Given a change node, When it is expanded, Then its steps render as an ordered
+  never a blank card.
+- Given a change card, When it is expanded, Then its steps render as an ordered
   left-to-right chain, each step naming the files it covers, the lines added and removed,
   and a link to the change on GitHub.
 - Given a change that reached the expanded package, When its steps render, Then the first
@@ -68,8 +72,8 @@ silently diverging. Do not implement a screen you have not looked at.
   in the range are listed alongside, each reachable without collapsing first.
 - Given any level, When the breadcrumb is read, Then it shows the path from the repository
   through the package to the change, and each segment returns to that level when activated.
-- Given the keyboard alone, When a node is focused, Then it can be expanded and collapsed
-  without a pointer.
+- Given the keyboard alone, When a change card is focused, Then it can be expanded and
+  collapsed without a pointer.
 - Given a first visit, When the page loads, Then a dismissible walkthrough introduces the
   slider and the three levels, and it can be replayed afterwards.
 - Given a package expanded in a window with no changes, When the level renders, Then it says
@@ -89,7 +93,7 @@ Extend chunk 04's derivation module — do not start a second one. Add:
 Ordering must be deterministic and stated: choose merge date or attribution order, and say
 which in the completion report.
 
-### 2. The nodes
+### 2. The change cards
 
 Level 2 is a **card list anchored to the expanded package**, not a graph of pull-request
 nodes: the package card sits at the left, the change cards run down the middle with
@@ -138,9 +142,9 @@ An empty state for an expanded package with no changes in the range, distinct fr
       whose files that package owns; fails because the function does not exist
 - [ ] T004 — edit the derivation module from chunk 04 — add package-level and step-level
       derivation
-- [ ] T005 [P] — create the change node component — label, metadata, spanned packages,
-      approach note, fallback treatment
-- [ ] T006 [P] — create the step node component
+- [ ] T005 [P] — create the change card component — label, metadata, spanned packages,
+      approach note in full, fallback treatment
+- [ ] T006 [P] — create the step card component
 - [ ] T007 — edit the canvas component — expansion state, level transitions, keyboard
       expand/collapse
 - [ ] T008 [P] — create the breadcrumb component
@@ -150,7 +154,7 @@ An empty state for an expanded package with no changes in the range, distinct fr
 
 Judgment calls to explain in the completion report:
 
-- You may order change nodes by merge date or by attribution; say which and why.
+- You may order change cards by merge date or by attribution; say which and why.
 - You may render the fallback treatment as a badge, a muted style, or an explicit note; say
   which, and how a viewer tells it apart from a real label.
 - You may hold expansion state in the URL or in component state; say which, and whether an
@@ -173,7 +177,7 @@ snapshot with it are both renderable.
 
 This chunk extends chunk 04's derivation module and reuses its layout function, its canvas
 component and the shadcn primitives from chunk 01. Record `Reuse: importing <X> from <Y>`
-for each. Write new code only for the two node components, the breadcrumb, the walkthrough
+for each. Write new code only for the two card components, the breadcrumb, the walkthrough
 and the empty state. Before adding any local-persistence helper, search for one already in
 the tree.
 
@@ -188,8 +192,9 @@ the tree.
 
 ## External Dependencies
 
-- `@xyflow/react` — custom nodes for the change and step levels, and the expansion
-  interaction.
+- `@xyflow/react` — reused for Level 1. Levels 2 and 3 are card layouts (design pages 5
+  and 6), so whether they are React Flow custom nodes or plain DOM is the implementer's
+  call — decide it against the designs and record it in the completion report.
 - shadcn/ui primitives from chunk 01 — card, badge, dialog, button.
 
 ## Verification Gates
@@ -208,11 +213,12 @@ pnpm build
 pnpm typecheck
 
 # Gate 2 — the approach note is rendered, not just carried in the data. Assert the change
-# node component reads the approach field. Adjust the field name to the schema in use.
-node_src=$(git ls-files | grep -iE 'change.*node.*\.tsx$' | head -1)
-[ -n "$node_src" ] || { echo "FAIL: no change node component found" >&2; exit 1; }
-grep -qE '\bapproach\b' "$node_src" || {
-  echo "FAIL: the change node does not render the approach note" >&2; exit 1; }
+# card component reads the approach field. Level 2 is a card list (design page 5), so the
+# component is named for a card; do not reintroduce a 'node' filename pattern here.
+card_src=$(git ls-files 'src/components/**' | grep -iE 'change.*card.*\.tsx$' | head -1)
+[ -n "$card_src" ] || { echo "FAIL: no change card component found" >&2; exit 1; }
+grep -qE '\bapproach\b' "$card_src" || {
+  echo "FAIL: the change card does not render the approach note" >&2; exit 1; }
 
 # Gate 3 — a missing enrichment cannot produce an empty label. Run the derivation spec that
 # covers it and assert it executed, rather than trusting an exit code from an empty run.
@@ -223,7 +229,7 @@ GATE
 ```
 
 **Prove each gate can fail.** Run every gate against the base commit and record the exact
-command, exit status, and failure evidence — no change node component exists on base, so
+command, exit status, and failure evidence — no change card component exists on base, so
 gate 2 fails on its first assertion. Run the negative control per assertion: remove the
 approach field from the component, confirm gate 2 fires, restore it from a copied backup —
 not with `git checkout --` — and confirm the gate returns clean.
@@ -233,7 +239,7 @@ not with `git checkout --` — and confirm the gate returns clean.
 - [ ] `completion-report.md` in this directory, **committed**, written from
       `.claude/resources/templates/completion-report.md`
 - [ ] Package-level and step-level derivation, tested directly
-- [ ] Change node and step node components, with an explicit fallback treatment
+- [ ] Change card and step card components, with an explicit fallback treatment
 - [ ] Breadcrumb navigation and keyboard-reachable expand/collapse
 - [ ] A dismissible, replayable onboarding walkthrough
 - [ ] An empty state for an expanded package with no changes in range

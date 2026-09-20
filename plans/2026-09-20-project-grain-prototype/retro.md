@@ -727,6 +727,42 @@ unindexed snapshot file makes it report `Tests 1 failed | 4 passed`. Canary re-r
 lead at this boundary to confirm the tripwire still fires. Promoted to `project.md`
 § Conventions.
 
+#### Framework friction — a design amendment applied section-by-section leaves a plan that contradicts itself
+
+**The friction.** Wave 4's preflight found chunk 05's plan asserting both things about Level 2
+at once. Its Context, all four relevant acceptance criteria, tasks T005/T006, the Reuse Audit
+and the Deliverables all said "node"; its § "The nodes" section said a **card list anchored to
+the package, not a graph of pull-request nodes**. The rubric carried both too, so items 47/49
+("exactly one node per pull request") and item 60 ("Level 2 presents changes as cards") could
+not both pass. And gate 2 resolved its target with
+`git ls-files | grep -iE 'change.*node.*\.tsx$'`, which exits 1 with "no change node component
+found" against an implementer who correctly built `change-card.tsx`. A chunk graded like this
+fails whatever it builds.
+
+**The cause.** The `designs_received` event at `887056f` records chunks 02/04/05/06 "and their
+rubrics amended to match". That amendment was real but partial: it rewrote the sections that
+*describe* Level 2 and left the sections that *specify* it — criteria, tasks, deliverables,
+gates. The standing rule in `prompts/execute.md` § Standing rules is **"Amendments travel in
+pairs"**, and it is written narrowly: *"No plan amendment is complete until the matching rubric
+item is amended in the same commit."* It names plan → rubric and nothing else, so amending the
+prose and the rubric prose both satisfies it while the acceptance criteria, the task list and
+the gate still encode the old decision. The rule's own framing — a *pair* — is what makes a
+partial sweep feel complete.
+
+**The fix.** Widen the rule from a pair to a sweep in `prompts/execute.md` § Standing rules:
+*"A plan amendment is complete when every section that encodes the old decision has changed —
+Context, Acceptance Criteria, What To Do, Tasks, Deliverables, Verification Gates, and the
+rubric. Grep the chunk for the old noun before committing the amendment; the prose is the
+easiest part to fix and the least load-bearing."* The mechanical form is cheap: after amending
+a chunk, `grep -in '<old term>' <chunk>/plan.md <chunk>/rubric.md` and account for every hit.
+This would have caught all three defects in one command.
+
+**Second-order note.** Verification gates are the part that hurts most, because a gate encodes
+a decision as a *filename pattern* — the least reviewable place a design decision can hide.
+Chunk 04's preflight caught the same shape (`app/**/*.tsx` globbing zero files in a `src/`-rooted
+project); this is the second time a gate's path assumption survived a plan amendment. Two
+occurrences makes it a pattern, not an accident.
+
 #### Carry-forward claims re-derived for wave 4
 
 - **Chunk 05's inputs exist as described.** `src/lib/view/` holds `derive.ts`, `layout.ts`,
