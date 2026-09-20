@@ -1,7 +1,7 @@
 'use client';
 
 import { ClockIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { Slider } from '@/components/ui/slider';
 import { cn } from 'cn';
@@ -91,14 +91,46 @@ export function TimeSlider({
   // Several presets collapse to the same range on a short history — every rolling preset
   // clamps to the whole capture. Searching from the widest end means the pill that lights
   // up is the honest one ("All time"), not whichever preset happens to be listed first.
+  // Compared as instants, not as strings: the range can arrive either as a history bound
+  // ("2026-09-02T00:00:00Z", straight off the snapshot) or as a slider-derived timestamp
+  // ("2026-09-02T00:00:00.000Z"). Those are the same moment and must light the same pill.
   const activePreset = useMemo(
     () =>
       [...PRESETS].reverse().find((preset) => {
         const candidate = presetRange(history, preset.id);
-        return candidate.from === range.from && candidate.to === range.to;
+        return Date.parse(candidate.from) === from && Date.parse(candidate.to) === to;
       })?.id ?? null,
-    [history, range],
+    [history, from, to],
   );
+
+  const controlRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Home and End jump to the repository's start and end, as design page 10's keyboard
+   * hint promises.
+   *
+   * The primitive only gets half of this right. Measured against the installed
+   * `@base-ui/react` 1.8.0, in `SliderThumb`'s keydown switch (no line number: the
+   * dependency is a caret range, so a line citation here would go stale unread): on a
+   * range slider `END` resolves to `sliderValues[index + 1] - step * minStepsBetweenValues`
+   * when a thumb follows, and `HOME` to `sliderValues[index - 1] + step *
+   * minStepsBetweenValues` when one precedes — so End on the *left* handle and Home on the
+   * *right* handle clamp against the other thumb instead of jumping to the track's bound.
+   * Only Home-on-left and End-on-right fall through to `min`/`max`.
+   *
+   * So the keys are handled here in the capture phase, before the thumb sees them, and
+   * mean the same thing whichever handle has focus: Home moves the range's start to the
+   * repository start, End moves its end to the repository end.
+   */
+  function onKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Home' && event.key !== 'End') return;
+    const control = controlRef.current;
+    if (control === null || !(event.target instanceof Node) || !control.contains(event.target)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    onRangeChange(event.key === 'Home' ? { from: history.from, to: range.to } : { from: range.from, to: history.to });
+  }
 
   const spanDays = Math.max(1, Math.round((to - from) / DAY_MS));
   const sameYear = new Date(from).getUTCFullYear() === new Date(to).getUTCFullYear();
@@ -155,7 +187,7 @@ export function TimeSlider({
         </div>
       </div>
 
-      <div className="relative h-16">
+      <div ref={controlRef} onKeyDownCapture={onKeyDownCapture} className="relative h-16">
         {/* The histogram sits behind the track: bars inside the range are lit, the rest muted. */}
         <div aria-hidden className="absolute inset-x-0 bottom-4 flex h-12 items-end gap-px">
           {volume.map((bucket) => {
@@ -203,7 +235,7 @@ export function TimeSlider({
       </div>
 
       <p className="text-right font-mono text-[11px] text-muted-foreground">
-        ← → nudge {stepLabel} · Tab reaches each handle · presets move both
+        ← → nudge {stepLabel} · Home / End jump to repo start / end · Tab reaches each handle
       </p>
     </section>
   );

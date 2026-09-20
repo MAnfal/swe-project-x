@@ -62,6 +62,14 @@ export function GrainWorkspace({ entries, snapshots }: GrainWorkspaceProps) {
     setFocused(null);
   }
 
+  // Focus narrows the canvas to one package's neighbourhood; the empty state says every
+  // package in the repository is dimmed. Held at once they describe different pictures, so
+  // changing the range drops focus — the same thing switching repository already does.
+  function changeRange(next: DateRange) {
+    setRange(next);
+    setFocused(null);
+  }
+
   if (entries.length === 0) {
     return (
       <main className="flex flex-1 items-center justify-center p-8">
@@ -136,7 +144,7 @@ export function GrainWorkspace({ entries, snapshots }: GrainWorkspaceProps) {
             history={history}
             packageCount={view.packageCount}
             nearest={nearest}
-            onRangeChange={setRange}
+            onRangeChange={changeRange}
           />
         ) : null}
       </div>
@@ -147,7 +155,7 @@ export function GrainWorkspace({ entries, snapshots }: GrainWorkspaceProps) {
         volume={volume}
         changeCount={view.changeCount}
         touchedCount={view.touchedCount}
-        onRangeChange={setRange}
+        onRangeChange={changeRange}
       />
     </main>
   );

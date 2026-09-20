@@ -76,6 +76,17 @@ describe('layoutGraph (T004)', () => {
     expect(positioned.map((node) => node.id)).toEqual(['app']);
   });
 
+  it('does not let a dangling edge shift the nodes that are in the list', () => {
+    // dagre's `setEdge` conjures a node for an unknown endpoint and ranks it. A phantom
+    // *source* takes rank 0 and pushes the real graph a whole rank to the right, so the
+    // returned ids alone cannot tell "phantom dropped" from "phantom created" — the
+    // positions can.
+    const nodes = [{ id: 'app' }, { id: 'lib' }];
+    const real = [{ from: 'app', to: 'lib' }];
+
+    expect(layoutGraph(nodes, [{ from: 'ghost', to: 'app' }, ...real])).toEqual(layoutGraph(nodes, real));
+  });
+
   it('returns nothing for an empty graph', () => {
     expect(layoutGraph([], [])).toEqual([]);
   });

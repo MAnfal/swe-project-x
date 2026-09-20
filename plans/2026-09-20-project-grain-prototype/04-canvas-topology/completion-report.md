@@ -3,7 +3,32 @@
 Branch `feat/project-grain-prototype--canvas-topology`, worktree
 `/Users/anfal/Projects/hobby_projects/swe-take-home/.worktrees/04-canvas-topology`,
 base `a2b8565`. Commits: `de50039` (derivation, layout, catalog), `5f27970` (components),
-plus this report.
+`512c5ed` (this report), plus the review-iteration-1 fixes.
+
+**The mid-fi designs were supplied before any implementation began.** They landed in
+`887056f` ("plan: fold mid-fi designs into Project Grain plan", 2026-09-20 02:26 -0700) and
+this chunk's first commit is `de50039` (2026-09-20 08:48 -0700); `git merge-base
+--is-ancestor 887056f de50039` exits 0, so the design commit is an ancestor of every commit
+here. Pages 1, 4, 7, 10 and 11 were opened and read before the corresponding presentation
+component was written, and every deviation from them is listed in § Deviations.
+
+## Review iteration 1 — what changed in response
+
+Verdict was FAIL on three blocking items. All three are addressed; the non-blocking focus +
+empty-window warning is fixed too.
+
+| Issue | Fix | Where the evidence is |
+| ----- | --- | --------------------- |
+| 1a. `historyBounds`'s widening loop survived deletion | Four new cases in `derive.test.ts`, driven by the real snapshot with its *declared window* moved | § Mutation kills, mutant A |
+| 1b. `volumeSeries`'s final-bucket clamp survived deletion | Four new cases in `derive.test.ts` with a merge landing exactly on the history bound | § Mutation kills, mutant B |
+| 2. Design page 10's `Home`/`End` and `⇕ resize` undisclosed | `Home`/`End` **built**; `⇕ resize` **disclosed** with the measurement | § Deviations, "Design page 10" |
+| 3. Report did not state the designs preceded implementation | Stated above, verified independently from git | the paragraph above |
+| Warning: focus persisting into an empty range | `changeRange` clears focus, matching `selectRepository` | § Mutation kills, "Focus and the empty state" |
+| Warning: `layoutGraph`'s known-node guard untested | New case pins it by position, not by returned ids | § Mutation kills, mutant C |
+
+No production behaviour in `derive.ts` or `layout.ts` changed for issue 1 — the
+implementation was already correct and the specs were vacuous, which is what was fixed.
+`derive.ts` and `layout.ts` are byte-identical to the reviewed versions.
 
 ## What changed
 
@@ -29,6 +54,16 @@ plus this report.
 | `src/app/page.tsx` | edited | Replaced the create-next-app placeholder; hands the client the committed snapshots |
 | `src/app/layout.tsx` | edited | Title/description, and a body that fills the viewport so the canvas can |
 
+Changed in response to review iteration 1:
+
+| File | Change | Why |
+| ---- | ------ | --- |
+| `src/lib/view/fixture.ts` | edited | Added `snapshotWithDeclaredWindow`, which re-parses the committed snapshot with a different *declared* window. Every pull request stays the real captured object; only the field under test moves. The snapshot file is not edited (Principle 4) |
+| `src/lib/view/derive.test.ts` | edited | Eight new cases pinning the two branches the fixture's own window could never reach: `historyBounds`'s widening, and `volumeSeries`'s final-bucket clamp |
+| `src/lib/view/layout.test.ts` | edited | One new case pinning the known-node guard by **position** rather than by returned ids |
+| `src/components/canvas/time-slider.tsx` | edited | `Home`/`End` jump to the repository's start/end (design page 10); preset matching compares instants rather than strings |
+| `src/components/canvas/grain-workspace.tsx` | edited | `changeRange` clears focus, so the canvas can no longer contradict the empty state's copy |
+
 ## Acceptance criteria
 
 | Criterion | Met | Evidence |
@@ -45,8 +80,9 @@ plus this report.
 
 ## Tests
 
-`pnpm test` reported **94 passed (94)** on the base tree and **135 passed (135)** now — 41
-new assertions across four new spec files.
+`pnpm test` reported **94 passed (94)** on the base tree and **144 passed (144)** now — 50
+new assertions across four new spec files (135 before review iteration 1, plus the nine
+cases added to kill the three mutants below).
 
 | Test | Red run (before implementation) | Green run |
 | ---- | ------------------------------- | --------- |
@@ -54,6 +90,12 @@ new assertions across four new spec files.
 | `src/lib/view/layout.test.ts` (T004) | Same import failure first; then after `derive.ts` existed, six of seven cases failed at runtime with `TypeError: default.Graph is not a constructor` at `layoutGraph src/lib/view/layout.ts:43:17` → `Tests 6 failed \| 121 passed (127)` | as above |
 | `derive.test.ts > nearestActivity` (three cases, added for the empty state) | `TypeError: nearestActivity is not a function` at `src/lib/view/derive.test.ts:288:12` → `Tests 3 failed \| 132 passed (135)` | as above |
 | `src/lib/view/catalog.test.ts` (five cases) | `FAIL src/lib/view/catalog.test.ts` / `Error: Cannot find package '@/lib/view/catalog' imported from …/src/lib/view/catalog.test.ts` → `Test Files 1 failed \| 9 passed (10)` | as above |
+
+The nine cases added in review iteration 1 were written against code that was **already
+correct**, so there is no "module missing" red run for them. Their red run is the mutant:
+each was verified by re-applying the mutation it exists to catch and watching it fail by
+name. That evidence is in § Mutation kills below — it is the only thing that proves those
+tests can fail.
 
 The layout red run is worth keeping: it is not a "module missing" failure but a real
 measurement — see § Deviations.
@@ -66,16 +108,28 @@ Baseline captured on the base tree (`a2b8565`) in this worktree before any edit,
 `pnpm typecheck` exit 0 with no output, `pnpm build` exit 0. **Zero pre-existing errors and
 zero warnings**, so every result below is also the delta.
 
-All four standard gates were re-run **after the last edit**, in order, type check last.
+All four standard gates were re-run **after the last edit** of review iteration 1, in
+order, type check last. Counts below are the post-iteration-1 run.
 
 | Gate | Command | Result | Fails on base? |
 | ---- | ------- | ------ | -------------- |
 | Lint | `pnpm lint` | exit 0, no output | No — base is clean too. `pnpm exec eslint --max-warnings 0` also exits 0 with no output, so "lint passed" here does mean "lint had nothing to say" |
-| Unit tests | `pnpm test` | exit 0, `Test Files 10 passed (10)` / `Tests 135 passed (135)` | Yes, for this chunk's specs: on base they fail to import (`Cannot find package '@/lib/view/derive'`). The base suite itself passes at 94 |
+| Unit tests | `pnpm test` | exit 0, `Test Files 10 passed (10)` / `Tests 144 passed (144)` | Yes, for this chunk's specs: on base they fail to import (`Cannot find package '@/lib/view/derive'`). The base suite itself passes at 94 |
 | Build | `pnpm build` | exit 0, `✓ Compiled successfully`, `Finished TypeScript in 2.1s`, `Route (app) ┌ ○ /` — statically prerendered | No — base builds clean. Falsified by canary instead (below) |
 | Type check | `pnpm typecheck` | exit 0, no output | No — base is clean. Falsified by canary instead (below) |
 | Gate 2 — no curated repository name in source | see script below | exit 0, `gate 2: scanning 38 source files` / `gate 2: PASS` | **No, and it cannot.** See the honest note below |
 | Gate 3 — inactive is not colour alone | see script below | exit 0, `gate 3: PASS — the states differ by non-colour properties, not hue alone` with `inactive: 76: 'border-dashed border-muted-foreground/50 bg-transparent opacity-45'` and `active: 77: : 'border-solid bg-card shadow-sm'` | **Yes**, exit 1: `FAIL: src/components/canvas/package-node.tsx is missing — the gate has nothing to check` |
+
+Final run, after the last edit of review iteration 1:
+
+```
+### pnpm lint      -> exit 0   (pnpm exec eslint --max-warnings 0 -> exit 0)
+### pnpm test      -> exit 0   Test Files  10 passed (10) / Tests  144 passed (144)
+### pnpm build     -> exit 0   Route (app) ┌ ○ /   ○  (Static)  prerendered as static content
+### pnpm typecheck -> exit 0
+### gate 2         -> exit 0   gate 2: scanning 38 source files / PASS
+### gate 3         -> exit 0   gate 3: PASS — the states differ by non-colour properties, not hue alone
+```
 
 ### Gate 2 cannot fail on the base tree — reporting it rather than claiming a pass
 
@@ -253,6 +307,128 @@ pnpm test -> exit 0
 `src/lib/snapshots/`, `pnpm test` goes red until `node scripts/build-snapshot-index.mts` is
 re-run (or `pnpm build`, which runs it). Worth telling them at the merge.
 
+## Mutation kills — review iteration 1
+
+The reviewer found two survivors. I reproduced both on the reviewed tree before changing
+anything, added tests, then re-applied each mutant and recorded the named tests that die.
+Every mutation was restored with `cp` from a copied backup, never `git checkout --`, and
+`git status --porcelain` was empty afterwards.
+
+### Before: both mutants survived
+
+```
+=== MUTANT A (before the fix): delete historyBounds's widening loop ===
+pnpm test -> exit 0
+ Test Files  10 passed (10)
+      Tests  135 passed (135)
+
+=== MUTANT B (before the fix): remove volumeSeries's final-bucket clamp ===
+pnpm test -> exit 0
+ Test Files  10 passed (10)
+      Tests  135 passed (135)
+derive.ts restored byte-for-byte
+```
+
+### Why the fixture alone could not reach either branch
+
+`src/lib/snapshots/xyflow-xyflow-2026-08-31.json` declares
+`window: { since: 2026-08-31T00:00:00Z, until: 2026-09-02T00:00:00Z }`, and all six of its
+merges land strictly inside it (oldest `2026-08-31T09:22:57Z`, newest
+`2026-09-01T12:02:55Z`). So the widening loop never widens, and no merge ever sits at the
+history's upper bound.
+
+Rather than hand-author a snapshot — Principle 4 forbids editing the committed one, and a
+hand-rolled one would exercise only the simple case — `fixture.ts` grew
+`snapshotWithDeclaredWindow`, which re-parses the **real** snapshot through `snapshotSchema`
+with a different declared window. Every pull request stays the producer's real captured
+object; the one field under test moves. Same technique as
+`transcriptWithReversedListing` in `src/lib/ingest/fixtures/replay.ts`, which permutes real
+captured pull requests to expose an ordering the capture happened not to contain.
+
+### Mutant A — `historyBounds`'s widening loop deleted
+
+Mutation: the whole `for (const pullRequest of snapshot.pullRequests)` loop in
+`derive.ts:80-90` replaced with `void from; void to;`.
+
+```
+pnpm test -> exit 1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge outside the declared window (T003) > widens the upper bound to the newest merge when the declared window ends before it
+AssertionError: expected '2026-09-01T00:00:00Z' to be '2026-09-01T12:02:55Z' // Object.is equality
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge outside the declared window (T003) > widens the lower bound to the oldest merge when the declared window starts after it
+AssertionError: expected '2026-08-31T12:00:00Z' to be '2026-08-31T09:22:57Z' // Object.is equality
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge outside the declared window (T003) > leaves a pull request outside the declared window reachable by the full-history range
+AssertionError: expected 2 to be 6 // Object.is equality
+      Tests  3 failed | 140 passed (143)
+```
+
+The third case is the one that matters most: it asserts the *reason* the loop exists — with
+the loop gone, the all-time range reaches 2 of the 6 changes instead of all 6.
+
+### Mutant B — `volumeSeries`'s final-bucket clamp removed
+
+Mutation: `Math.min(bucketCount - 1, Math.max(0, …))` at `derive.ts:114` reduced to
+`Math.max(0, …)`.
+
+```
+pnpm test -> exit 1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/lib/view/derive.test.ts > volumeSeries — a merge landing exactly on the upper bound (T003) > emits exactly the requested number of buckets
+AssertionError: expected [ { …(3) }, { …(3) }, { …(3) }, …(6) ] to have a length of 8 but got 9
+ FAIL  src/lib/view/derive.test.ts > volumeSeries — a merge landing exactly on the upper bound (T003) > counts that merge in the final bucket rather than off the end of the series
+AssertionError: expected NaN to be greater than or equal to 1
+ FAIL  src/lib/view/derive.test.ts > volumeSeries — a merge landing exactly on the upper bound (T003) > still accounts for every pull request exactly once
+AssertionError: expected false to be true // Object.is equality
+      Tests  3 failed | 140 passed (143)
+```
+
+The failure mode is worse than the comment implied and the tests now pin all of it: the
+write lands on `counts[bucketCount]`, which is `undefined`, so `undefined + 1` stores `NaN`
+**and extends the array** — nine buckets instead of eight, with a `NaN` count in the last
+one. A `NaN` bar height would render as no bar at all.
+
+**One branch deliberately left untested:** the *lower* clamp, `Math.max(0, …)`. It is
+unreachable by construction — `volumeSeries` derives `start` from `historyBounds(snapshot)`,
+which is already widened down to the earliest merge, so `offset` cannot be negative for any
+snapshot. It is defensive, and I would rather say that than write a test that cannot
+distinguish anything.
+
+### Mutant C — `layoutGraph`'s known-node guard removed (the reviewer's warning)
+
+The old case only checked returned ids, which are always copied from the input `nodes`
+array and so cannot tell "phantom dropped" from "phantom created". The new case pins it by
+**position**: a phantom *source* takes dagre rank 0 and pushes the real graph a rank right.
+
+Mutation: `if (!known.has(edge.from) || !known.has(edge.to)) continue;` removed.
+
+```
+pnpm test -> exit 1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/lib/view/layout.test.ts > layoutGraph (T004) > does not let a dangling edge shift the nodes that are in the list
+AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+      Tests  1 failed | 143 passed (144)
+layout.ts restored byte-for-byte
+```
+
+### Focus and the empty state (the reviewer's warning)
+
+`grain-workspace.tsx` now routes both the slider and the empty state through `changeRange`,
+which clears `focused` — the same thing `selectRepository` already did for repository
+switches. Measured on the built app: focus `@xyflow/svelte` (canvas narrows to 4 nodes, one
+`aria-pressed="true"`), then scrub the right handle back past the first merge:
+
+```json
+{"range":["2026-08-31T00:00:00.000Z","2026-08-31T08:00:00.000Z"],
+ "header":"0 changes · 0 of 10 packages touched",
+ "nodesOnCanvas":10, "stillFocused":0, "untouchedOnCanvas":10,
+ "emptyStateHeading":"Nothing landed in this window",
+ "emptyStateCopy":"No pull requests touched any package in xyflow/xyflow between Aug 31 and Aug 31, 2026. All 10 packages are dimmed because none were reached, directly or otherwise."}
+```
+
+Ten nodes on the canvas, all ten untouched, none focused — the picture now matches the
+sentence. (I verified the fixed state in the browser; the broken state is the reviewer's
+reproduction, not re-derived here.)
+
 ## Deployment measurement — how the picker discovers snapshots
 
 Measured rather than assumed, as the dispatch asked.
@@ -417,6 +593,58 @@ param is part of what preserves that (see § Judgment calls).
   up page 4 without touching this code — but no toggle was added, since none of the designs
   shows one and the plan does not ask for it.
 
+- **Design page 10's keyboard model: `Home`/`End` built, `⇕ resize` not built.** Missed in
+  the first pass; raised by the reviewer. Page 10's footer hint reads
+  `← → nudge a day · ⇕ resize · Home / End jump to repo start / end`.
+
+  **`Home`/`End` are now implemented**, because the installed primitive gets only half of
+  them right. Measured against `@base-ui/react` 1.8.0,
+  `node_modules/@base-ui/react/slider/thumb/SliderThumb.js:323-328`:
+
+  ```js
+  case _composite.END:
+    newValue = range && Number.isFinite(sliderValues[index + 1]) ? sliderValues[index + 1] - step * minStepsBetweenValues : max;
+    break;
+  case _composite.HOME:
+    newValue = range && Number.isFinite(sliderValues[index - 1]) ? sliderValues[index - 1] + step * minStepsBetweenValues : min;
+    break;
+  ```
+
+  On a two-thumb range that means `Home` on the **left** handle and `End` on the **right**
+  handle fall through to `min`/`max` and behave as the design says — but `End` on the left
+  handle and `Home` on the right handle clamp to just beside the *other thumb* instead.
+  `TimeSlider` now takes both keys in the capture phase, before the thumb sees them, and
+  gives them one meaning whichever handle has focus: **Home moves the range's start to the
+  repository start, End moves its end to the repository end.** That reading is the literal
+  words of the hint, it is a superset of the half the primitive already got right, and it
+  can never invert the range. Verified on the built app — the two cases the primitive gets
+  wrong:
+
+  ```
+  range Aug 31 00:00 → Sep 1 04:00, LEFT handle focused, press End
+    -> ["2026-08-31T00:00:00.000Z", "2026-09-02T00:00:00.000Z"]   (range end jumped to repo end)
+       the primitive alone would have moved `from` to 2026-09-01T03:00Z instead
+
+  range Aug 31 10:00 → Sep 2 00:00, RIGHT handle focused, press Home
+    -> ["2026-08-31T00:00:00.000Z", "2026-09-02T00:00:00.000Z"]   (range start jumped to repo start)
+       the primitive alone would have moved `to` back beside the left thumb instead
+  ```
+
+  The footer hint now reads
+  `← → nudge an hour · Home / End jump to repo start / end · Tab reaches each handle`.
+
+  **`⇕ resize` is deliberately not built.** Two reasons, and I would rather state them than
+  ship a guess. First, the mid-fi specifies neither the anchor nor the amount — "resize" a
+  range could mean widen/narrow about its centre, about the focused handle, or about the
+  fixed handle, by one step or one large step, and page 10's four state cards (REST,
+  DRAGGING, HANDLE FOCUSED, PRESET APPLIED) do not describe it. Second, `⇕` means the
+  Up/Down arrows, which already carry a meaning here: `SliderThumb.js:303-311` maps
+  `ARROW_UP`/`ARROW_DOWN` to ±`step` on the focused thumb, which is also what the WAI-ARIA
+  slider pattern specifies and what a screen-reader user expects. Redefining them to resize
+  the whole range would make this slider behave unlike every other one. If the intent is a
+  real resize gesture it wants its own decision — and most likely a pointer drag on the lit
+  segment rather than an arrow-key override. Flagged for the plan rather than guessed at.
+
 - **Design element not built: the `main` branch chip and the `Legend` / `?` header buttons**
   (page 4, top right). The branch chip has no data behind it in the snapshot schema — nothing
   records the analyzed branch — and the Legend and help buttons open a panel and the
@@ -429,6 +657,14 @@ param is part of what preserves that (see § Judgment calls).
   "--max-warnings" were found`, exit 2. The form that works is
   `pnpm exec eslint --max-warnings 0` (exit 0, no output here). This is the mirror image of
   the `pnpm test --run` note already in that file.
+
+- **Preset matching compared ISO strings, not instants.** Found while verifying `Home`/`End`:
+  a range bound can arrive either straight off the snapshot (`2026-09-02T00:00:00Z`) or from
+  the slider (`2026-09-02T00:00:00.000Z`). Those are the same moment, but string equality
+  said otherwise, so after a `Home`/`End` press the `All time` pill went dark and `Custom`
+  lit up for a range that *was* all time. `activePreset` now compares `Date.parse` values.
+  Confirmed on the built app: `All time` reads `pressed` on load and stays pressed after
+  `Home`/`End` return the range to the full history.
 
 - **The plan's gate-2 recipe is blind to uncommitted files.** Documented above under § Gates.
   Worth correcting in the plan so a later chunk's probe is not silently vacuous.

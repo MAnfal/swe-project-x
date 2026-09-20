@@ -11,7 +11,7 @@ import {
   type DateRange,
 } from '@/lib/view/derive';
 
-import { loadSnapshot } from './fixture';
+import { loadSnapshot, snapshotWithDeclaredWindow } from './fixture';
 
 const snapshot = loadSnapshot();
 
@@ -217,6 +217,85 @@ describe('volumeSeries and history bounds (T003)', () => {
 
   it('returns the same series when it runs twice', () => {
     expect(volumeSeries(snapshot, 24)).toEqual(volumeSeries(snapshot, 24));
+  });
+});
+
+describe('historyBounds — a merge outside the declared window (T003)', () => {
+  // The declared window is the authority, but a merge that landed outside it would be
+  // unreachable by any range the slider can express, so the bounds widen to contain it.
+  // The captured window contains all six of its merges, so the case is made by moving the
+  // *declared* window over the same real pull requests.
+
+  it('widens the upper bound to the newest merge when the declared window ends before it', () => {
+    // PRs 5997 (11:53:10Z) and 5992 (12:02:55Z) both merged after this `until`.
+    const snapshot = snapshotWithDeclaredWindow({
+      since: '2026-08-31T00:00:00Z',
+      until: '2026-09-01T00:00:00Z',
+    });
+
+    expect(historyBounds(snapshot).to).toBe('2026-09-01T12:02:55Z');
+  });
+
+  it('widens the lower bound to the oldest merge when the declared window starts after it', () => {
+    // PRs 5989 (09:22:57Z) and 5987 (09:36:49Z) both merged before this `since`.
+    const snapshot = snapshotWithDeclaredWindow({
+      since: '2026-08-31T12:00:00Z',
+      until: '2026-09-02T00:00:00Z',
+    });
+
+    expect(historyBounds(snapshot).from).toBe('2026-08-31T09:22:57Z');
+  });
+
+  it('leaves a pull request outside the declared window reachable by the full-history range', () => {
+    // This is what the widening is for: the all-time range must still reach every change.
+    const snapshot = snapshotWithDeclaredWindow({
+      since: '2026-08-31T12:00:00Z',
+      until: '2026-09-01T00:00:00Z',
+    });
+
+    const view = deriveWindow(snapshot, historyBounds(snapshot));
+
+    expect(view.changeCount).toBe(6);
+    expect(view.pullRequests.map((pr) => pr.number)).toEqual([5992, 5997, 5994, 5977, 5987, 5989]);
+  });
+
+  it('does not widen when every merge is already inside the declared window', () => {
+    expect(historyBounds(loadSnapshot())).toEqual({
+      from: '2026-08-31T00:00:00Z',
+      to: '2026-09-02T00:00:00Z',
+    });
+  });
+});
+
+describe('volumeSeries — a merge landing exactly on the upper bound (T003)', () => {
+  // `until` is PR 5992's own merge timestamp, so the history ends exactly on a merge and
+  // that merge's offset is the full span. Without the final-bucket clamp its bucket index
+  // is `bucketCount`, one past the end of the array.
+  const snapshot = snapshotWithDeclaredWindow({
+    since: '2026-08-31T00:00:00Z',
+    until: '2026-09-01T12:02:55Z',
+  });
+
+  it('puts the history bound exactly on that merge', () => {
+    expect(historyBounds(snapshot).to).toBe('2026-09-01T12:02:55Z');
+  });
+
+  it('emits exactly the requested number of buckets', () => {
+    expect(volumeSeries(snapshot, 8)).toHaveLength(8);
+  });
+
+  it('counts that merge in the final bucket rather than off the end of the series', () => {
+    const series = volumeSeries(snapshot, 8);
+
+    expect(series[series.length - 1].count).toBeGreaterThanOrEqual(1);
+    expect(series[series.length - 1].to).toBe('2026-09-01T12:02:55Z');
+  });
+
+  it('still accounts for every pull request exactly once', () => {
+    const series = volumeSeries(snapshot, 8);
+
+    expect(series.every((bucket) => Number.isInteger(bucket.count))).toBe(true);
+    expect(series.reduce((sum, bucket) => sum + bucket.count, 0)).toBe(snapshot.pullRequests.length);
   });
 });
 
