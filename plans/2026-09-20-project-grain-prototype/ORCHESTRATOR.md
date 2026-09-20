@@ -37,8 +37,8 @@ See `SPEC.md` in this directory.
 
 | Chunk | Story | Status | PR | Blocker |
 | ----- | ----- | ------ | -- | ------- |
-| 01 | Foundation | PR open | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
-| 02 | US1 | Not started | — | — |
+| 01 | Foundation | Merged | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
+| 02 | US1 | In progress | — | — |
 | 03 | US1 | Not started | — | — |
 | 04 | US1 | Not started | — | — |
 | 05 | US1 | Not started | — | — |
@@ -68,6 +68,11 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `gates_passed` | 01 | Lead re-ran all four at `c391559` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Tests 3 passed (3)`, `pnpm build` compiled, `pnpm typecheck` 0 |
 | 2026-09-20 | `pr_created` | 01 | [#1](https://github.com/MAnfal/swe-project-x/pull/1) → `feat/plan--project-grain-prototype`, at `f958434` (chunk work `c391559` + plan-branch bookkeeping merged in) |
 | 2026-09-20 | `review_passed` | 01 | Iteration 1. Reviewer re-derived gate falsifiability with its own canaries and independently verified the `src/lib/**` arbitration against both sources. Two non-blocking warnings: `project.md` frontmatter still carries `id:`; `shadcn` sits in `dependencies` |
+| 2026-09-20 | `pr_merged` | 01 | #1 merged at `5e49bd2`. Lead re-verified the merged tree: `pnpm lint` 0, `pnpm test` `Tests 3 passed (3)`, `pnpm build` compiled, `pnpm typecheck` 0; `pnpm dev` serves HTTP 200 at localhost:3000 |
+| 2026-09-20 | `wave_merged` | — | Wave 1 complete. Worktree `.worktrees/01-boilerplate` removed; `git worktree list` clean. Foundation story checkpoint reached |
+| 2026-09-20 | `preflight_failed` | 02 | Wave 2 preflight caught two gate defects invisible until chunk 01 wrote `project.md`: Gate 1's `pnpm test --run` exits `ERROR Unknown option: 'run'` before vitest starts (fatal under `set -euo pipefail`), and Gate 3's `lib/**/*.ts` glob matches nothing. Both fixed at `20c9ff9`, with `pnpm exec tsc --noEmit` replaced by the declared `pnpm typecheck` |
+| 2026-09-20 | `wave_started` | — | Wave 2 — preflight clean after the fixes: plan branch 0 behind `origin/main`, all six chunk-02 reference paths resolve, chunk-01 outputs present on the plan branch. Chunk 02's rubric regenerated against the now-populated Convention Map |
+| 2026-09-20 | `chunk_dispatched` | 02 | Worktree `.worktrees/02-ingest-core` on `feat/project-grain-prototype--ingest-core` from `5e49bd2`; bootstrapped with `pnpm install` and a `.env.local` carrying a real `GITHUB_TOKEN` (gitignored) so the fixture can be captured rather than hand-authored. All four gates verified green in the worktree before dispatch |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
@@ -113,7 +118,7 @@ software rather than a half-built layer.
 
 | Story | Last chunk | Checkpoint — what works once this merges | Reached? |
 | ----- | ---------- | ---------------------------------------- | -------- |
-| Foundation | 01 | `pnpm dev` serves a Next.js page; type check, lint, tests and build all run and are recorded in `project.md` | ☐ |
+| Foundation | 01 | `pnpm dev` serves a Next.js page; type check, lint, tests and build all run and are recorded in `project.md` | ☑ 2026-09-20 |
 | US1 (P1) | 05 | Open the deployed page, pick a pre-analyzed repository, scrub to any window, see which packages changed, expand one to its changes with labels and approach notes, expand a change to its ordered steps. No token, no network, no model call. | ☐ |
 | US2 (P2) | 06 | Choose `Other…`, paste a GitHub monorepo URL, watch specific progress, and land on the same three levels with labels generated on demand. | ☐ |
 

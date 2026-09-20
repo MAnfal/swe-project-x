@@ -136,6 +136,82 @@ Every one of these is a candidate for `.claude/resources/project.md`.
   a package ships no types.
 - **`src/lib/` modules are standalone functions over plain objects**, each with a
   co-located `*.test.ts`. No class, registry, or one-implementation interface.
+- **The CLI lives in `scripts/`, not `src/lib/`.** Principle 1 names route handlers and
+  `scripts/` as the only places a credential is read, and Principle 3 forbids filesystem
+  writes only on paths reachable from a route handler — so a script that writes a snapshot
+  file is legal and a `src/lib/` module that does the same is not. There is no Convention
+  Map row for `scripts/**` yet; chunk 02 reports it as a `project.md` delta.
+- **Fixtures belong under `src/**/fixtures/`.** The Convention Map row is
+  `src/**/fixtures/**/*.json` and chunk 02's Gate 2 greps `git ls-files` for
+  `fixtures?/.*\.json$`. A fixture placed outside `src/` matches neither the row nor the
+  gate, and would pass review by being invisible to it.
+
+### Wave 1 → Wave 2 boundary
+
+- **Chunk 01 merged at `5e49bd2`.** Lead re-verified the merged tree rather than trusting
+  the pre-merge run: lint 0, `Tests 3 passed (3)`, build compiled, typecheck 0, and
+  `pnpm dev` serving HTTP 200. The Foundation checkpoint holds — the page that renders is
+  still the scaffolder's default, which is correct for a chunk whose deliverable was the
+  gates and `project.md`, not a surface.
+- **Chunk 01's two non-blocking warnings are still open** (`project.md` frontmatter carries
+  `id:`; `shadcn` sits in `dependencies` rather than `devDependencies`). Neither belongs in
+  chunk 02 — it touches neither file — so they were not folded in. They are cheap and
+  should be absorbed by whichever later chunk edits `package.json`.
+
+#### Framework friction — a worktree is cut from the commit, not from the lead's working tree
+
+1. **The friction.** Wave 2 preflight found two defects in chunk 02's gate block and I
+   fixed them in the main checkout. I then created the worktree and dispatched. The
+   implementer received the **unfixed** plan: `git worktree add` materializes the branch
+   *commit*, and my fixes were still uncommitted working-tree changes. I caught it only
+   because I grepped the worktree's copy afterwards on a hunch. Recovery was cheap here —
+   commit, push, fast-forward the chunk branch, message the implementer — but only because
+   nothing had been committed in the worktree yet. Ten minutes later it would have been a
+   merge into someone else's live edits.
+
+2. **The cause.** `prompts/worktree.md` § "Creating one" anticipates exactly one staleness
+   mode: *"Cut it from the current tip of the plan branch. For a sequential chunk that means
+   fetching after the prerequisite merged — a worktree created from a stale tip is how an
+   implementer ends up re-doing work that already landed."* That is about **other people's
+   merged commits**, and `git fetch` solves it. It says nothing about the lead's **own
+   uncommitted edits**, against which `git fetch` is useless. The trap is structural rather
+   than incidental: `prompts/preflight.md` is the step whose whole job is to *produce* plan
+   amendments, and it closes with *"Fix the plan — or the tree — before spawning anyone"* —
+   "fix", never "commit". `prompts/execute.md` § Step 3 then orders worktree creation
+   immediately after preflight. The three files compose into a sequence where the most
+   likely moment to have uncommitted plan edits is the moment just before the one command
+   that cannot see them.
+
+3. **The fix.** Two edits, both one line.
+   - `prompts/worktree.md` § "Creating one", before the `git worktree add` snippet: *"Commit
+     and push your plan amendments first. `git worktree add` materializes the branch's
+     **commit**, not your working tree — an uncommitted preflight fix is invisible to the
+     implementer, and `git fetch` does not help. Confirm with `git status --short` before
+     running the command below."*
+   - `prompts/preflight.md` § "On failure", amend the closing line to *"Fix the plan — or
+     the tree — **and commit the fix** — before spawning anyone."*
+
+#### Tribal knowledge — the bootstrap supplies a real token, because Principle 4 requires one
+
+1. **The decision.** Chunk 02's worktree was bootstrapped with a `.env.local` holding a
+   real `GITHUB_TOKEN`, taken from `gh auth token`.
+2. **The obvious alternative.** Bootstrap with the empty `.env.example` template and let
+   the implementer stub the network, which is what a reviewer reading the bootstrap step
+   would expect and what every other worktree would need.
+3. **The constraint that made it right.** Principle 4 and Design Decision 6 require the
+   fixture to be *captured output of the real producer*. That is unsatisfiable without a
+   working token at implementation time: you cannot capture a real GitHub response without
+   calling GitHub. Handing the implementer an empty token would have forced it to choose
+   between a blocked chunk and a hand-authored fixture, and the second is the one that
+   looks like progress. `project.md`'s Bootstrap row already anticipates this — *"plus
+   `cp .env.example .env.local` and fill it in, for any chunk that calls the GitHub or
+   Anthropic API"* — but "fill it in" is addressed to nobody in particular, and the lead is
+   the only party who can do it before dispatch.
+4. **The recognition signal.** A chunk whose deliverable is a **captured** fixture, or any
+   artifact whose provenance is itself a graded property. The moment a principle says "real
+   output of the real producer", the credential that reaches the real producer becomes a
+   bootstrap requirement rather than a runtime concern.
+
 
 ---
 
