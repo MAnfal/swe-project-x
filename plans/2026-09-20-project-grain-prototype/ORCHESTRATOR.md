@@ -39,8 +39,8 @@ See `SPEC.md` in this directory.
 | ----- | ----- | ------ | -- | ------- |
 | 01 | Foundation | Merged | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
 | 02 | US1 | Merged | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
-| 03 | US1 | Not started | — | — |
-| 04 | US1 | Not started | — | — |
+| 03 | US1 | Merged | [#3](https://github.com/MAnfal/swe-project-x/pull/3) | — |
+| 04 | US1 | In review | — | — |
 | 05 | US1 | Not started | — | — |
 | 06 | US2 | Not started | — | — |
 
@@ -80,6 +80,22 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `pr_merged` | 02 | #2 merged at `000da8d`. Lead re-verified the merged tree, type check last: `pnpm lint` 0, `pnpm test` `Tests 94 passed (94)` / 7 files, `pnpm build` 0, `pnpm typecheck` 0 |
 | 2026-09-20 | `wave_merged` | — | Wave 2 complete. Worktree `.worktrees/02-ingest-core` removed; `git worktree list` clean. Its presence was why the first `pnpm lint` on the merged tree reported 148 errors — all under `.worktrees/`; promoted to `project.md` |
 | 2026-09-20 | `preflight_failed` | 03, 04 | Wave 3 preflight halted on four defects. (a) Chunks 03–06 all still carried wave 2's two gate defects — the fix at `20c9ff9` was applied to chunk 02 only; re-measured, `pnpm test --run` exits 1, `pnpm exec tsc --noEmit` exits 0 but is off-convention. (b) Chunk 04's gate 2 globbed `app/**/*.tsx` and `lib/**/*.ts`, which match 0 files in a `src/`-rooted project. (c) Chunk 04 was written against a "fixture snapshot committed by chunk 02" that does not exist — chunk 02 committed a *transcript*. (d) Rubrics 03–06 were never regenerated against the Convention Map despite the explicit Plan-Specific Constraint; 02 had 6 citations, 03 and 04 had 0. All four fixed; 03 and 04 rubrics regenerated (05 and 06 regenerate before their own waves) |
+
+| 2026-09-20 | `chunk_dispatched` | 04 | Worktree `.worktrees/04-canvas-topology` on `feat/project-grain-prototype--canvas-topology` from `a2b8565`; bootstrapped with `pnpm install`, all four gates verified green before dispatch. No credential needed — its snapshot is replayed offline from chunk 02's transcript |
+| 2026-09-20 | `chunk_dispatched` | 03 | Worktree `.worktrees/03-ai-enrichment` from `cb41f75`, bootstrapped with `pnpm install` and `.env.local` carrying a working `GITHUB_TOKEN` and a workspace-scoped `ANTHROPIC_API_KEY`. Dispatch was held ~40 min on credentials: the first key was org-scoped (400, needs `anthropic-workspace-id`) and the second was invalid (401) |
+| 2026-09-20 | `gates_passed` | 04 | Lead re-ran all four in the worktree, type check last: `pnpm lint` 0, `pnpm test` `Tests 135 passed (135)` / 10 files, `pnpm build` 0, `pnpm typecheck` 0. Snapshot provenance verified — byte-identical to a fresh offline replay except `metadata.analyzedAt`. Lead also drove the running app and looked at Level 1, focus and the empty state directly |
+| 2026-09-20 | `gates_passed` | 03 | Lead re-ran all four in the worktree, type check last: `pnpm lint` 0, `pnpm test` `Tests 135 passed (135)` / 9 files, `pnpm build` 0, `pnpm typecheck` 0. Enrichment coverage derived from the files rather than the report: 100/100, 36/36, 100/100, zero missing `label`/`approach`/`steps` |
+| 2026-09-20 | `review_iteration` | 04 | Iteration 1 **FAIL**, narrow — no architectural defect. Reviewer mutation-tested `derive.ts`/`layout.ts` (7 mutants) and found two survivors: `historyBounds`'s widening loop and `volumeSeries`'s final-bucket clamp both delete with 135/135 still green, because the fixture has no PR outside the window or on a bucket boundary. Lead reproduced both independently. Also: an undisclosed design deviation on page 10 (Home/End and whole-range resize), verified against the `@base-ui/react` primitive source, and a missing statement that designs preceded implementation |
+
+| 2026-09-20 | `review_iteration` | 03 | Iteration 1 **FAIL**, one blocking item — no behavioural defect. Reviewer mutated `resolveSteps`' prefix-uniqueness check (`=== 1` → `>= 1`, silently accepting an ambiguous SHA prefix) and all 135 tests stayed green; the collision case is untested though the code handles it. Lead reproduced it, plus the non-blocking case-insensitivity survivor. Reviewer independently confirmed both plan gate defects the chunk reported |
+
+| 2026-09-20 | `review_passed` | 03 | Iteration 2, fresh reviewer (never reused). Confirmed production code byte-identical to the reviewed tree — the specs were the defect, not the code. Swept five areas neither prior reviewer touched (zero-commit skip, fallback-is-not-a-cache-hit, key derivation, payload bounding, `assertSafeKey`/`buildRecord`) and killed all five mutants. Independently re-verified both plan gate-defect fixes on a detached worktree at `cb41f75`. Two non-blocking warnings |
+| 2026-09-20 | `gates_passed` | 03 | Lead re-ran all four at `4133d49` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Test Files 9 passed (9) / Tests 140 passed (140)`, `pnpm build` 0, `pnpm typecheck` 0. Also re-applied all four SHA-resolver mutants independently — each killed a named test, tree clean after each |
+| 2026-09-20 | `pr_created` | 03 | [#3](https://github.com/MAnfal/swe-project-x/pull/3) → `feat/plan--project-grain-prototype`, at `4133d49` (3 commits) |
+
+| 2026-09-20 | `review_iteration` | 04 | Iteration 2 **FAIL**, fresh reviewer. Confirmed iteration 1's two mutants are genuinely dead, then widened as instructed and found three new survivors in the same functions — `historyBounds`' two boundary-tie comparisons and `volumeSeries`' span guard, each 144/144 green. Lead reproduced all three and split them by reachability: `github.ts:139` filters to `[since, until)` so the ties are defensive-only, but `snapshotSchema` accepts a zero-width **and inverted** window, so the span guard is reachable and yields a silent `NaN`. Iteration 3 scoped to those three plus a reachability disclosure, with a stated stopping rule: further survivors confined to unreachable defensive code are warnings, not blockers |
+
+| 2026-09-20 | `pr_merged` | 03 | #3 merged at `45866bf`, brought onto the plan branch by merge (never rebase) at `ccaadcf`. Lead re-verified the merged tree: lint 0 (scoped `pnpm exec eslint src scripts`, because chunk 04's worktree is still live), `pnpm test` `Test Files 9 passed (9) / Tests 140 passed (140)`, `pnpm build` 0, `pnpm typecheck` 0. Worktree `.worktrees/03-ai-enrichment` removed. Chunk 03's 8 `project.md` deltas applied by the lead, with the new CLI flags verified against `scripts/ingest.mts --help` rather than trusted |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
@@ -175,6 +191,55 @@ for judgment calls. Amend in place with a dated note if one changes mid-executio
    need durable server-side job state, which is out of scope for a prototype running in one
    bounded request. Build those screens' layout with copy that matches what actually
    happens: a retry restarts.
+
+10. **Enrichment runs on `claude-haiku-4-5`, not an Opus-tier model.** Added 2026-09-20,
+    before chunk 03 dispatched. The plan had defaulted to `claude-opus-5` in three places
+    with **no recorded reason** — the owner challenged it and no justification existed.
+
+    The reasoning that replaced the default: the enrichment payload is **metadata only** —
+    commit messages, file paths, PR title and body, no diffs — because decision 4 keeps one
+    call per pull request affordable. With that input the ceiling on `approach` quality is
+    set by how much signal the commit messages carry, not by the model reading them. A
+    larger model cannot infer the road not taken from evidence that is not in the payload.
+    Two of the three output fields (`label`, `steps`) are extraction and summarization
+    besides. Haiku 4.5 is also $1/$5 per MTok against $5/$25, and faster per call across a
+    three-repository bake.
+
+    **This is a reversible decision made on a prior, and it is set up to be corrected by
+    evidence.** The model id is read from an environment variable, so escalating costs an
+    env change and a re-bake, not a code change. The trigger is already a rubric item that
+    predates this decision: *"The approach note describes how the change was made, not a
+    restatement of what changed — graded by reading several baked records, not by field
+    presence alone."* If chunk 03's reviewer finds the notes read as restatements, that is
+    the signal to escalate, and the chunk reports it with quoted examples rather than
+    passing silently. Chunk 03 also reports measured token totals per repository, because
+    those are what an escalation argument would need and they are unrecoverable afterwards.
+
+    Note for implementers: Haiku 4.5 is not an Opus-family model. `output_config.effort`
+    errors on it, and its context window is 200K rather than 1M.
+
+    **Resolved 2026-09-20, after the bake — the decision holds and the trigger did not fire.**
+    236 pull requests enriched across the three repositories: 322,449 input / 32,742 output
+    tokens, **$0.49** against $2.43 for the same payload on Opus 5. The lead read nine baked
+    `approach` notes spanning all three repositories and judged them genuine method rather
+    than restatement — e.g. *"Inlined the work of updateAbsolutePositions directly into
+    updateNodeInternals to avoid iterating the nodeLookup twice"* (xyflow#5972), and
+    *"Registered an abort event listener on the operation's signal that completes the
+    observer, triggering existing teardown logic"* (trpc#7434). The notes that do read as
+    restatement are all dependency bumps and release-bot pull requests, which have no approach
+    to describe — that is a property of the input, not of the model. Chunk 03 independently
+    reached the same conclusion and correctly declined to escalate on its own. **Do not
+    re-open this without new evidence.**
+
+
+11. **The time slider's `⇕ resize` gesture is deferred, not dropped.** Decided 2026-09-20 at
+    chunk 04's second review. Design page 10 shows the affordance but none of its four state
+    cards fixes the gesture's anchor or its amount, so building it means inventing the
+    interaction — and `⇕` is Up/Down, which already carry the ARIA slider meaning of ±step on
+    the focused thumb. A chunk graded against the design should not guess at the design.
+    Filed as `plans/ideas/slider-range-resize-gesture.md` with what a real decision would have
+    to settle. Chunk 04 ships Home/End jump-to-bounds, which covers the overlapping need.
+
 
 ### Complexity
 

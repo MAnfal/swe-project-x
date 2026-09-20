@@ -420,6 +420,45 @@ parallel-wave boundary section, chunk 04 gained 6 plus a deployment section.
 about to dispatch, not just the plan — at minimum, that the rubric cites the Convention Map at
 all when the map is non-empty. Recorded for Part 2.
 
+#### User correction — an unjustified model default survived planning and two reviews
+
+The owner asked what our rationale was for `claude-opus-5`, and there wasn't one. The model
+id appeared three times in chunk 03's plan — § What To Do, task T004, § External
+Dependencies — and was justified in none of them. Nothing in SPEC.md or the Design Decisions
+covered it. It was a default that got written down and then read back as though it were a
+decision.
+
+Worth noting where it *didn't* get caught. Chunk 03's plan was written, reviewed at planning
+time, and had its rubric regenerated at this wave's preflight — three passes over the same
+file — and none of them asked "why this model?". A named constant that looks like a
+considered choice reads as one. `plan-check` has no notion of an unjustified default, and
+neither does the rubric generator.
+
+My first answer to the challenge was worse than the question deserved: I defended the
+default by splitting the fields (`label`/`steps` are extraction, `approach` needs judgment)
+and recommended keeping Opus while testing alternatives. That framing skipped the fact I had
+just conceded — there was no rationale — and it also missed the substantive point, which the
+owner then made: **the payload is metadata only**. Decision 4 caps the input at commit
+messages, file paths and the PR body precisely to keep one call per pull request affordable.
+With that input the ceiling on `approach` quality is set by the signal in the commit
+messages, not by the model reading them. The argument for Opus was thinner than I made it
+sound, and I was defending a position rather than evaluating one.
+
+Settled as Design Decision 10: Haiku 4.5, with the escalation trigger bound to a rubric item
+that already existed, and per-repository token totals reported so a later escalation argument
+has evidence to stand on.
+
+**The generalization worth keeping**: a plan that names a model, a timeout, a page size, a
+retry count or a concurrency bound should carry the reason next to the number, or carry a
+pointer to the Design Decision that holds it. The cost of the missing sentence is not the
+wrong value — it is that nobody can tell a considered value from a default, so nobody
+re-examines it. Chunk 03's plan named `claude-opus-5` beside a correct pricing note, which
+made it look *more* considered, not less.
+
+**Proposed framework fix**: the planning phase should require a one-line rationale beside any
+externally-priced or externally-bounded constant, and `plan-check` should flag a model id
+that appears in a chunk plan with no Design Decision referencing it. Recorded for Part 2.
+
 #### Tribal knowledge — the parallel wave shares a directory, and that was a deliberate choice
 
 1. **The decision.** Chunks 03 and 04 both write committed snapshots. I put them in one
@@ -443,6 +482,130 @@ all when the map is non-empty. Recorded for Part 2.
 snapshots, one of them un-enriched. That is not a defect — it is the case chunk 04's renderer
 is explicitly required to handle, now exercised by real committed data rather than only by a
 spec.
+
+
+### Wave 3 — chunks 03 and 04
+
+#### Pattern — three chunks, three reviews, the same failure mode
+
+Every chunk in this plan that contained non-trivial logic has failed its first review for
+**tests that cannot fail**, and for nothing else:
+
+| Chunk | Iteration 1 verdict | What survived |
+| ----- | ------------------- | ------------- |
+| 02 | FAIL | Three tests that passed against any implementation |
+| 03 | FAIL | `resolveSteps`' prefix-uniqueness check: `=== 1` → `>= 1`, 135/135 green |
+| 04 | FAIL | `historyBounds`' widening loop deleted, and `volumeSeries`' final-bucket clamp removed — 135/135 green for each |
+
+No iteration-1 review has ever found a behavioural defect in this plan. The code has been
+correct every time. What the review loop has caught, three times out of three, is **evidence
+that does not exist** — and in each case a mutation the lead then reproduced independently in
+under a minute.
+
+Two things this says, and they point in different directions.
+
+**The loop is working.** These are not nitpicks. Chunk 04's `volumeSeries` clamp is the
+difference between a merge exactly at `to` landing in the last bucket and writing off the end
+of the array; chunk 03's uniqueness check is the difference between a mistyped SHA degrading
+and silently attaching a step to the wrong commit. Both would have shipped invisible, and both
+would have surfaced later as data that looks almost right.
+
+**But "tests first, seen failing" is not catching it, and that is the interesting part.** Every
+one of these chunks *did* write tests first and *did* observe them red. The red run proves the
+test fails when the module does not exist. It proves nothing about whether the test fails when
+the module is *wrong*. A test written against a fixture that lacks the edge case is red before
+implementation and green after, exactly like a good test, and stays green forever after the
+guarantee is deleted.
+
+The common shape is sharper than "write better tests": in all four surviving mutants, the
+unpinned logic was a **guard for an input the committed fixture does not contain** — a PR
+outside the declared window, a merge exactly on a bucket boundary, two commits sharing a
+prefix, an uppercase SHA. Principle 4 pushes hard toward testing against real captured output,
+which is right, and the cost is that a real fixture only contains the cases that repository
+happened to produce. The guard for the case it *didn't* produce has nothing to hold it.
+
+**Proposed framework fix** (recorded for Part 2, not applied mid-plan): the chunk-plan template's
+Test Plan section should require, per guard or boundary in the implementation, a named test
+whose input is **constructed** rather than drawn from the fixture — and `generate-chunk-rubric`
+should emit a standing rubric item: *"For each defensive branch, a test exists whose input
+cannot come from the committed fixture."* The evidence is three chunks out of three, which is
+enough to stop treating it as a per-chunk implementer failure and start treating it as a hole in
+what we ask for.
+
+#### Framework friction — the session scratchpad is shared, and it silently corrupted a gate run
+
+Chunk 04 reported a gate failing with a message it had never written:
+`FAIL: expected a committed snapshot per curated repository, found 1`. Nothing was wrong with
+chunk 04. Its `gate2.sh` had been **overwritten by chunk 03's gate 2**, which counts curated
+snapshots and asserts enrichment — a different chunk's gate, in a file with the same name.
+
+I confirmed it by listing the directory afterwards. Every agent in this wave writes to one flat
+path, `<session>/scratchpad/`:
+
+```
+09:44  chunk04-gate2.sh   chunk04-gate3.sh   (chunk 04, after renaming defensively)
+09:37  gate2.sh                              (chunk 03's, overwriting chunk 04's 08:55 copy)
+09:42  d2.bak  derive-prev.ts  a.txt  b.txt  (mine, the lead)
+09:31  e.bak                                 (mine)
+09:29  d.bak                                 (mine)
+```
+
+**The lead is implicated too, and more dangerously.** `d.bak` and `d2.bak` are my backups of
+`derive.ts`; `e.bak` is my backup of `enrichment.ts`. My mutation loops restore from those by
+copying them back **into a worktree**. If a subagent had happened to write a file named `d.bak`
+between my backup and my restore, I would have copied another agent's file into chunk 04's
+source tree and then reported a gate result from it. A `git diff` would have caught it here —
+but only because I happened to check, and only because the tree is version-controlled.
+
+**The direction that actually frightens me is the one that did not happen.** Chunk 04 noticed
+because the borrowed gate *failed* with unfamiliar wording. A borrowed gate that **passed**
+would have been recorded as evidence, in a completion report, under a chunk it never tested.
+Every other integrity mechanism in this loop — the reviewer, the lead's re-run, the falsification
+controls — reads the gate's output. None of them checks that the script producing it is the one
+the chunk wrote.
+
+This is not a subagent mistake. `execute.md` tells agents to use the scratchpad and never says
+the scratchpad is shared, so two agents choosing the obvious filename `gate2.sh` is the expected
+outcome of following the instructions, not a deviation from them.
+
+**Proposed framework fix**, recorded for Part 2:
+
+1. `execute.md` § Dispatching subagents should state that the scratchpad is shared across every
+   agent in the session, and require each agent to work in
+   `<scratchpad>/<agent-name>/` — a directory it creates and owns.
+2. The dispatch brief template should carry that instruction, so it arrives with the work rather
+   than depending on the implementer having read the prompt file.
+3. Gate scripts are chunk artifacts and belong in the **worktree**, not the scratchpad — a
+   worktree is per-chunk by construction, and a gate script committed alongside the chunk is
+   reviewable evidence rather than an untracked file that can vanish. This is the fix I would
+   actually make; the first two are mitigations for everything else agents put there.
+
+I have already applied (1) informally by giving iteration 3's reviewer its own subdirectory and
+moving my own backups into `lead-04-i3/`.
+
+#### Lead error — a measurement I reported with a caveat that could not carry its weight
+
+I gave chunk 03's dispatch brief a table of merged-PR density: xyflow 67, shadcn-ui 13, trpc 36
+at 90 days. The real numbers are **118, 212 and 36**. shadcn-ui was off by 16×.
+
+The method was the bug. I listed *closed* pull requests sorted by `updated`, capped at 6 pages,
+and counted the merged ones. In a repository with a large backlog of closed-but-unmerged pull
+requests that keep receiving comments, the most-recently-*updated* closed PRs are dominated by
+old unmerged ones, so the sample contained almost no recent merges. `trpc/trpc` came out exact
+only because its backlog is small — which is worse than being uniformly wrong, because one
+correct row makes the table look calibrated. The right query is the search API with
+`is:pr is:merged merged:A..B`, which returns an exact `total_count`.
+
+I did label it "lower bounds, not exact counts". That was true and it was not enough. A caveat
+is doing too much work when the gap between the number and reality is 16×: an implementer could
+reasonably have read "13" and dropped `shadcn-ui/ui` from the curated set as too quiet to be
+worth scrubbing. The chunk was not misled only because it re-measured at bake time, which is the
+behaviour the brief asked for — but the brief should not have needed rescuing.
+
+**The generalization**: when the lead hands an implementer a number, the caveat has to be
+proportionate to how wrong the number can be. "Lower bound" is fine for a 10% sampling error and
+useless for a 16× one. If the method can be off by an order of magnitude, either measure
+properly or hand over the *query* rather than the result and let the implementer run it.
 
 
 ---
