@@ -12,6 +12,117 @@ this chunk's first commit is `de50039` (2026-09-20 08:48 -0700); `git merge-base
 here. Pages 1, 4, 7, 10 and 11 were opened and read before the corresponding presentation
 component was written, and every deviation from them is listed in § Deviations.
 
+## Wave-boundary integration — chunk 03's merge
+
+Iteration 3 passed with no blocking issues. What follows is **integration resolution at the
+wave boundary, not scope I took on**: the lead merged `feat/plan--project-grain-prototype`
+into this branch (chunk 03 landed as PR #3, bringing three baked snapshots) and asked me to
+resolve the resulting three failures. Both changes below were made on the lead's explicit
+instruction, and one of them edits a file chunk 03 owns and that has already been reviewed.
+
+Merge commit on this branch: `ca621a5`. Failures reproduced before touching anything:
+
+```
+ × lists every snapshot committed to the directory, and nothing else
+ × xyflow-xyflow-2026-08-31.json carries enrichment for every pull request
+ × xyflow-xyflow-2026-08-31.json is mostly real model output, not a directory of fallbacks
+      Tests  3 failed | 196 passed (199)
+```
+
+### 1. The stale index — mine, and the test doing its job
+
+`src/lib/view/catalog.generated.ts` listed one snapshot; the directory now holds four.
+`node scripts/build-snapshot-index.mts` regenerated it (`wrote 4 snapshots`). This is
+exactly the drift `catalog.test.ts > lists every snapshot committed to the directory` was
+written to catch, and it caught it at the first opportunity.
+
+### 2. The shared-directory invariant — chunk 03's spec, changed on instruction
+
+`src/lib/ai/baked-snapshots.test.ts` reads every file under `src/lib/snapshots/` and
+asserted that each one carries enrichment for every pull request. That was true of
+everything chunk 03 baked; my un-enriched view fixture lives in the same directory by
+design, so the invariant became false the moment the two merged. Neither chunk was wrong —
+the shared directory was.
+
+**What I changed: the discriminator, and nothing else.** Not a whitelist of curated
+filenames — that rots, and it would stop catching a future bake that silently enriched
+nothing. The invariant is now the one that is actually true of the directory:
+
+- **No `enrichment` key at all** → an un-enriched view fixture. Assert the shape (pull
+  requests and packages present; schema validity is already enforced by the
+  `snapshotSchema.parse` in the collection helper) and assert nothing about enrichment.
+- **An `enrichment` key present** → it must be complete: every pull request enriched, with
+  a non-empty label, approach and steps. **Partial enrichment is the real defect** and this
+  now catches it on *any* snapshot, including one for a repository nobody has curated yet.
+- **Each curated repository must have at least one fully enriched committed snapshot.**
+  Matched by filename prefix, so it survives a re-bake at a different window and tolerates a
+  repository that also carries an un-enriched fixture. Chunk 03's existing "are present for
+  the curated repositories" assertion is untouched; this one is added beside it and reuses
+  the prefixes, which are now named once in `CURATED_REPOSITORIES`.
+
+The `is mostly real model output` test returns early when there is no `enrichment` key — a
+fallback ratio over zero claimed entries grades nothing.
+
+Everything else in that file — the commit-SHA check, the credential check, the presence
+check, the collection helper — is unchanged.
+
+**This is a stronger test than the one it replaces, and here is the proof.** Three canaries,
+each applied to a real committed snapshot, each restored with `cp` from a copied backup:
+
+```
+######## CANARY 1 — a curated bake produced no enrichment at all
+   (enrichment key deleted from xyflow-xyflow-2026-06-22.json)
+pnpm test -> exit 1
+ FAIL  … > xyflow-xyflow- has at least one fully enriched committed snapshot
+AssertionError: xyflow-xyflow-: no committed snapshot carries complete enrichment: expected 0 to be greater than 0
+      Tests  1 failed | 201 passed (202)
+
+######## CANARY 2 — PARTIAL enrichment: one entry dropped from a curated snapshot
+   (dropped enrichment key 005e5ee2a7379b94f0d90248740dcbba80aaa650)
+pnpm test -> exit 1
+ FAIL  … > xyflow-xyflow-2026-06-22.json is either fully enriched or has no enrichment at all
+AssertionError: pull request #5972 has no enrichment: expected undefined to be defined
+ FAIL  … > xyflow-xyflow- has at least one fully enriched committed snapshot
+      Tests  2 failed | 200 passed (202)
+
+######## CANARY 3 — the un-enriched fixture starts CLAIMING enrichment but carries none
+   (enrichment: {} added to xyflow-xyflow-2026-08-31.json)
+pnpm test -> exit 1
+ FAIL  … > xyflow-xyflow-2026-08-31.json is either fully enriched or has no enrichment at all
+AssertionError: pull request #5992 has no enrichment: expected undefined to be defined
+ FAIL  … > xyflow-xyflow-2026-08-31.json is mostly real model output, not a directory of fallbacks
+ FAIL  src/lib/view/catalog.test.ts > … > reports a snapshot the enrichment pass has not run over as un-enriched
+      Tests  4 failed | 202 total
+
+######## after restore
+curated snapshot restored byte-for-byte
+my snapshot restored byte-for-byte
+pnpm test -> exit 0
+      Tests  202 passed (202)
+```
+
+Canary 1 is the one that shows the two assertions are not redundant: with the enrichment key
+gone the *per-file* test correctly stays green — having no enrichment is legitimate — and
+only the curated test fires. Canary 3 is the one that shows the un-enriched branch is a
+discriminator rather than a blanket skip: the moment a fixture claims enrichment it is held
+to the same standard as any other snapshot. Canary 2 is the real defect the reframing was
+for. `git status --porcelain` was clean of snapshot changes afterwards.
+
+### The end state, rendered
+
+Built the merged tree, served it, and opened the picker. All four snapshots are listed,
+discovered from the directory, with mine correctly marked un-enriched:
+
+```json
+["shadcn-ui/ui  5 packages · 100 pull requests",
+ "trpc/trpc    40 packages ·  36 pull requests",
+ "xyflow/xyflow 10 packages · 100 pull requests",
+ "xyflow/xyflow 10 packages ·   6 pull requests · not enriched"]
+```
+
+That is the state the plan predicted: four snapshots, one of them un-enriched, rendered by
+a canvas that never branches on provenance.
+
 ## Review iteration 2 — what changed in response
 
 Verdict FAIL on three further survivors, all in the two functions iteration 1 had just
@@ -173,8 +284,10 @@ Baseline captured on the base tree (`a2b8565`) in this worktree before any edit,
 `pnpm typecheck` exit 0 with no output, `pnpm build` exit 0. **Zero pre-existing errors and
 zero warnings**, so every result below is also the delta.
 
-All four standard gates were re-run **after the last edit** of review iteration 2, in
-order, type check last. Counts below are the post-iteration-2 run.
+All four standard gates were re-run **after the last edit**, in order, type check last, on
+the **merged** tree (`ca621a5` plus the integration fixes) — the tree that will actually
+land. The suite is 202 there because chunk 03's specs merged in alongside; chunk 04's own
+contribution is 149 of them.
 
 | Gate | Command | Result | Fails on base? |
 | ---- | ------- | ------ | -------------- |
@@ -185,14 +298,14 @@ order, type check last. Counts below are the post-iteration-2 run.
 | Gate 2 — no curated repository name in source | see script below | exit 0, `gate 2: scanning 38 source files` / `gate 2: PASS` | **No, and it cannot.** See the honest note below |
 | Gate 3 — inactive is not colour alone | see script below | exit 0, `gate 3: PASS — the states differ by non-colour properties, not hue alone` with `inactive: 76: 'border-dashed border-muted-foreground/50 bg-transparent opacity-45'` and `active: 77: : 'border-solid bg-card shadow-sm'` | **Yes**, exit 1: `FAIL: src/components/canvas/package-node.tsx is missing — the gate has nothing to check` |
 
-Final run, after the last edit of review iteration 2:
+Final run, after the last edit, on the merged tree:
 
 ```
 ### pnpm lint      -> exit 0   (pnpm exec eslint --max-warnings 0 -> exit 0)
-### pnpm test      -> exit 0   Test Files  10 passed (10) / Tests  149 passed (149)
+### pnpm test      -> exit 0   Test Files  12 passed (12) / Tests  202 passed (202)   [merged tree]
 ### pnpm build     -> exit 0   Route (app) ┌ ○ /   ○  (Static)  prerendered as static content
 ### pnpm typecheck -> exit 0
-### gate 2         -> exit 0   gate 2: scanning 38 source files / PASS
+### gate 2         -> exit 0   gate 2: scanning 41 source files / PASS
 ### gate 3         -> exit 0   gate 3: PASS — the states differ by non-colour properties, not hue alone
 ```
 
@@ -852,6 +965,13 @@ Not edited here, as instructed. Each item below was measured in this worktree on
   reads "1 day · no activity". The designs' readout is day-granular and every design example
   is multi-day; changing it would mean a second time format for a case the designs never
   show.
+- **The picker now shows two rows both labelled `xyflow/xyflow`**, distinguished only by
+  their subtitle (`100 pull requests` vs `6 pull requests · not enriched`). That is the
+  honest consequence of two committed snapshots of the same repository at different windows,
+  and the ids behind them differ, so nothing is ambiguous to the code. It is a little
+  ambiguous to a reader. Left alone: the picker's evolution is chunk 06's (it adds `Other…`,
+  the URL input and the back arrow), and the fix — showing the window alongside the
+  repository — belongs in that pass rather than bolted on at a merge.
 - **The session scratchpad is shared between parallel agents, and it silently corrupted a
   gate run.** My gate scripts lived at
   `…/71fa1585-…/scratchpad/gate2.sh`. On the final iteration-3 run that script produced
