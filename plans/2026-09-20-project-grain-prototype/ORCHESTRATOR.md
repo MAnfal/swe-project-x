@@ -93,6 +93,8 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `gates_passed` | 03 | Lead re-ran all four at `4133d49` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Test Files 9 passed (9) / Tests 140 passed (140)`, `pnpm build` 0, `pnpm typecheck` 0. Also re-applied all four SHA-resolver mutants independently — each killed a named test, tree clean after each |
 | 2026-09-20 | `pr_created` | 03 | [#3](https://github.com/MAnfal/swe-project-x/pull/3) → `feat/plan--project-grain-prototype`, at `4133d49` (3 commits) |
 
+| 2026-09-20 | `review_iteration` | 04 | Iteration 2 **FAIL**, fresh reviewer. Confirmed iteration 1's two mutants are genuinely dead, then widened as instructed and found three new survivors in the same functions — `historyBounds`' two boundary-tie comparisons and `volumeSeries`' span guard, each 144/144 green. Lead reproduced all three and split them by reachability: `github.ts:139` filters to `[since, until)` so the ties are defensive-only, but `snapshotSchema` accepts a zero-width **and inverted** window, so the span guard is reachable and yields a silent `NaN`. Iteration 3 scoped to those three plus a reachability disclosure, with a stated stopping rule: further survivors confined to unreachable defensive code are warnings, not blockers |
+
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
 `wave_merged`, `plan_delivered`.
@@ -226,6 +228,15 @@ for judgment calls. Amend in place with a dated note if one changes mid-executio
     to describe — that is a property of the input, not of the model. Chunk 03 independently
     reached the same conclusion and correctly declined to escalate on its own. **Do not
     re-open this without new evidence.**
+
+
+11. **The time slider's `⇕ resize` gesture is deferred, not dropped.** Decided 2026-09-20 at
+    chunk 04's second review. Design page 10 shows the affordance but none of its four state
+    cards fixes the gesture's anchor or its amount, so building it means inventing the
+    interaction — and `⇕` is Up/Down, which already carry the ARIA slider meaning of ±step on
+    the focused thumb. A chunk graded against the design should not guess at the design.
+    Filed as `plans/ideas/slider-range-resize-gesture.md` with what a real decision would have
+    to settle. Chunk 04 ships Home/End jump-to-bounds, which covers the overlapping need.
 
 
 ### Complexity
