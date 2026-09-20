@@ -39,7 +39,7 @@ See `SPEC.md` in this directory.
 | ----- | ----- | ------ | -- | ------- |
 | 01 | Foundation | Merged | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
 | 02 | US1 | Merged | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
-| 03 | US1 | In review | — | — |
+| 03 | US1 | PR open | [#3](https://github.com/MAnfal/swe-project-x/pull/3) | — |
 | 04 | US1 | In review | — | — |
 | 05 | US1 | Not started | — | — |
 | 06 | US2 | Not started | — | — |
@@ -88,6 +88,10 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `review_iteration` | 04 | Iteration 1 **FAIL**, narrow — no architectural defect. Reviewer mutation-tested `derive.ts`/`layout.ts` (7 mutants) and found two survivors: `historyBounds`'s widening loop and `volumeSeries`'s final-bucket clamp both delete with 135/135 still green, because the fixture has no PR outside the window or on a bucket boundary. Lead reproduced both independently. Also: an undisclosed design deviation on page 10 (Home/End and whole-range resize), verified against the `@base-ui/react` primitive source, and a missing statement that designs preceded implementation |
 
 | 2026-09-20 | `review_iteration` | 03 | Iteration 1 **FAIL**, one blocking item — no behavioural defect. Reviewer mutated `resolveSteps`' prefix-uniqueness check (`=== 1` → `>= 1`, silently accepting an ambiguous SHA prefix) and all 135 tests stayed green; the collision case is untested though the code handles it. Lead reproduced it, plus the non-blocking case-insensitivity survivor. Reviewer independently confirmed both plan gate defects the chunk reported |
+
+| 2026-09-20 | `review_passed` | 03 | Iteration 2, fresh reviewer (never reused). Confirmed production code byte-identical to the reviewed tree — the specs were the defect, not the code. Swept five areas neither prior reviewer touched (zero-commit skip, fallback-is-not-a-cache-hit, key derivation, payload bounding, `assertSafeKey`/`buildRecord`) and killed all five mutants. Independently re-verified both plan gate-defect fixes on a detached worktree at `cb41f75`. Two non-blocking warnings |
+| 2026-09-20 | `gates_passed` | 03 | Lead re-ran all four at `4133d49` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Test Files 9 passed (9) / Tests 140 passed (140)`, `pnpm build` 0, `pnpm typecheck` 0. Also re-applied all four SHA-resolver mutants independently — each killed a named test, tree clean after each |
+| 2026-09-20 | `pr_created` | 03 | [#3](https://github.com/MAnfal/swe-project-x/pull/3) → `feat/plan--project-grain-prototype`, at `4133d49` (3 commits) |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
