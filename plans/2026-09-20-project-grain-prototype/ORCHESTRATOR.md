@@ -37,7 +37,7 @@ See `SPEC.md` in this directory.
 
 | Chunk | Story | Status | PR | Blocker |
 | ----- | ----- | ------ | -- | ------- |
-| 01 | Foundation | Not started | — | — |
+| 01 | Foundation | In progress | — | — |
 | 02 | US1 | Not started | — | — |
 | 03 | US1 | Not started | — | — |
 | 04 | US1 | Not started | — | — |
@@ -62,6 +62,8 @@ When every chunk is `Merged`, run `/plan:complete`.
 
 | Date | Event | Chunk | Detail |
 | ---- | ----- | ----- | ------ |
+| 2026-09-20 | `wave_started` | — | Wave 1 — preflight clean: plan branch level with `origin/main`, all chunk-01 reference paths resolve, pnpm 9.15.4 / node v24.13.0 present |
+| 2026-09-20 | `chunk_dispatched` | 01 | Worktree `.worktrees/01-boilerplate` on `feat/project-grain-prototype--boilerplate`; bootstrap is a no-op (no project exists yet) |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
@@ -124,10 +126,13 @@ for judgment calls. Amend in place with a dated note if one changes mid-executio
    plus a `(#123)` regex covers squash and merge commits but silently misses rebase merges,
    which leave no merge commit and no PR number. `/repos/{owner}/{repo}/pulls` and
    `/pulls/{n}/commits` are exact regardless of merge strategy.
-3. **Dependency edges are computed but not drawn.** Transitive attribution ("this PR
-   reached your package through Package 2") has no definition without the graph, but
-   rendering every edge in a monorepo produces an unreadable hairball. The edges surface as
-   a per-node count and on focus instead.
+3. ~~**Dependency edges are computed but not drawn.**~~ **Amended 2026-09-20**, before any
+   canvas chunk started: edges *are* drawn, but only between touched packages. Transitive
+   attribution has no definition without the graph, and the original concern — that a
+   monorepo with every edge drawn is an unreadable hairball — is real. The mid-fi designs
+   resolve it by dimming untouched packages and giving them no edges, so only the active
+   subgraph is drawn. That reads better than a count alone, because the dashed edge is what
+   makes "2 via package-2" mean something. See decision 8.
 4. **AI never sits between a click and a frame.** Enrichment is one model call per pull
    request, keyed by merge SHA. Curated repositories ship with it baked into the committed
    snapshot; live repositories generate it on expand and reuse it for the session. This is
@@ -144,6 +149,16 @@ for judgment calls. Amend in place with a dated note if one changes mid-executio
 7. **Level transitions replace the view; levels are not nested sub-flows.** dagre does not
    lay out sub-flows, and nesting would force elkjs and a more complex layout model for no
    gain the owner can see.
+8. **The mid-fi designs are authoritative over this plan's visual descriptions.** Delivered
+   2026-09-20 and committed at `design/mid-fi.pdf`, indexed by `design/README.md`. They
+   revised two decisions taken before they existed: Level 1 now draws edges between touched
+   packages (dimming, not hiding, is what prevents the hairball), and Level 2 is a card list
+   anchored to the expanded package rather than a graph of pull-request nodes.
+9. **No background jobs.** The designs' progress and error screens carry copy promising that
+   analysis survives a closed tab and that a retry resumes a partially fetched step. Both
+   need durable server-side job state, which is out of scope for a prototype running in one
+   bounded request. Build those screens' layout with copy that matches what actually
+   happens: a retry restarts.
 
 ### Complexity
 
@@ -181,12 +196,10 @@ graded against and records the date.
   runtime does not support them.
 - **Deployment target is Vercel.** No chunk may introduce a writable-filesystem dependency
   at request time, a background worker, or a git subprocess.
-- **Chunks 04, 05 and 06 stop and ask the user for the mid-fi designs** before their first
-  presentation component. The designs were still being produced when this plan was written.
-  Each of those chunks does its derivation, routing and test work first, then asks. When the
-  designs arrive they are authoritative over any layout this plan describes; a contradiction
-  is recorded in the completion report so the plan gets corrected rather than diverging
-  silently.
+- **The designs are delivered and committed at `design/mid-fi.pdf`.** Chunks 04, 05 and 06
+  read `design/README.md`, open the pages their screens need, and build against them. A
+  design that contradicts a chunk plan wins, and the contradiction is recorded in that
+  chunk's completion report. No chunk implements a screen nobody opened.
 - **Regenerate the rubrics for chunks 02–06 when chunk 01 merges.** They were written while
   `project.md`'s Convention Map was still empty, so they carry what the plan knew rather
   than what the project declares. Once chunk 01 writes the map, run `generate-chunk-rubric`

@@ -52,7 +52,13 @@ often as it passes a violation.
       a chip or hidden behind a control
 - [ ] A fallback-labelled change is visually distinguishable from an enriched one, and no
       code path renders a blank node
-- [ ] Steps render as an ordered chain, each naming the files it covers
+- [ ] Steps render as an ordered chain, each naming the files it covers, the lines added
+      and removed, and a link to the change on GitHub
+- [ ] The step where the change entered the expanded package is marked and named beneath
+      the chain, and that step is derived from file ownership rather than taken from model
+      output
+- [ ] Level 2 presents changes as cards anchored to the expanded package, with the other
+      packages active in the range reachable without collapsing first
 - [ ] The breadcrumb shows repository → package → change and each segment returns to that
       level
 - [ ] Expansion and collapse are reachable from the keyboard with visible focus
@@ -71,6 +77,10 @@ often as it passes a violation.
 - [ ] The completion report states whether the mid-fi designs were supplied before the
       presentation components were built, or that the user directed the chunk to proceed
       without them; where the designs contradicted the plan, the contradiction is recorded
+
+- [ ] The screens this chunk builds match the committed mid-fi designs; any place the
+      designs contradicted the chunk plan is named in the completion report, with the
+      design followed rather than the plan
 
 ## Verdict
 

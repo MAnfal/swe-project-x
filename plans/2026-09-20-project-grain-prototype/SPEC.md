@@ -33,7 +33,8 @@ can plan with confidence after being away from the code.
   touched it in the range is revealed, each showing a label, the PR number, author, merge
   date, the packages it spanned, and a one-line note on the approach taken.
 - Given a change node, When it is expanded, Then the ordered steps that produced it are
-  revealed as a left-to-right chain.
+  revealed as a left-to-right chain, each naming its files and the lines it added and
+  removed, with the step where the change entered the expanded package marked.
 - Given a range containing no activity, When the canvas renders, Then an empty state says
   so rather than rendering an empty canvas.
 
@@ -74,6 +75,8 @@ and demos against any public TypeScript monorepo.
 | Does AI sit in the render path? | No. Enrichment is a per-PR pass keyed by merge SHA, baked into curated snapshots ahead of time and generated on demand for live repositories. | 2026-09-20 |
 | Which repositories are pre-analyzed? | `xyflow/xyflow`, `shadcn-ui/ui`, `trpc/trpc` — all verified on 2026-09-20 as TypeScript monorepos with a `packages/` directory. | 2026-09-20 |
 | Local clone or GitHub API for ingest? | API only. The deployed app has no git binary and no writable filesystem, and a second clone-based path would diverge from the path the demo runs on. | 2026-09-20 |
+| Should Level 1 draw dependency edges? (revised) | Yes, but only between touched packages. The mid-fi designs avoid the hairball by dimming untouched packages rather than by hiding edges, which makes indirect reach legible. Supersedes the earlier "computed, never drawn" answer. | 2026-09-20 |
+| Does analysis survive a closed tab, or resume a failed step? | No. The prototype analyzes inside one request; a retry restarts. Design copy implying otherwise is rewritten, not implemented. | 2026-09-20 |
 
 ## Success Metrics
 
@@ -82,7 +85,8 @@ and demos against any public TypeScript monorepo.
   outbound network blocked.
 - Given the same snapshot input, the topology, the set of active packages for a window,
   and the per-package direct/indirect counts are identical on every run — asserted by
-  tests over a committed fixture.
+  tests over a committed fixture. The snapshot's declared `metadata` block is the only
+  part exempt, and it is the only place a timestamp appears.
 - For a window in which exactly N pull requests touched a package, expanding that package
   reveals exactly N change nodes, each carrying a label, an approach note, and at least
   one ordered step.
@@ -101,8 +105,10 @@ and demos against any public TypeScript monorepo.
 - **Conversational AI.** No chat surface over the canvas.
 - **Non-TypeScript ecosystems.** Topology discovery targets a TypeScript monorepo with
   workspace packages. Other ecosystems are a later replacement of one function body.
-- **Persistent server-side caching.** Live-analysis results are cached in memory for the
-  life of the serving instance. Durable storage is not in scope.
+- **Persistent server-side caching, background jobs, and resumable analysis.** Live
+  analysis runs inside the request that asked for it and is cached in memory for the life
+  of the serving instance. Closing the tab ends the work, and a retry restarts rather than
+  resuming. Durable job state is not in scope.
 - **Authentication, multi-user state, mobile layouts, and multi-repository comparison.**
 - **Temporal (co-change) coupling analysis.** A known-valuable, language-agnostic signal,
   deliberately deferred.

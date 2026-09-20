@@ -48,8 +48,10 @@ often as it passes a violation.
 - [ ] Derivation is separate from rendering: which packages are active and their counts are
       computed by plain functions over plain objects and tested directly, not inside a
       component
-- [ ] Dependency edges are not drawn by default; they surface as a per-node count and on
-      focus
+- [ ] Dependency edges are drawn between touched packages only; untouched packages carry
+      none, and an indirect reach is visually distinct from a direct dependency edge
+- [ ] Neither the active/inactive distinction nor the direct/indirect distinction rests on
+      colour alone
 - [ ] Active and inactive nodes differ by at least one non-colour property
 - [ ] The slider shows the repository's full history, the selected range as explicit dates,
       a change-volume indication, and the documented presets
@@ -67,6 +69,10 @@ often as it passes a violation.
 - [ ] The completion report states whether the mid-fi designs were supplied before the
       presentation components were built, or that the user directed the chunk to proceed
       without them; where the designs contradicted the plan, the contradiction is recorded
+
+- [ ] The screens this chunk builds match the committed mid-fi designs; any place the
+      designs contradicted the chunk plan is named in the completion report, with the
+      design followed rather than the plan
 
 ## Verdict
 

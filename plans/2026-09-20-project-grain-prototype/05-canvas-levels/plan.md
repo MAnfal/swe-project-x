@@ -34,34 +34,20 @@ carries the depth instead.
 Once this chunk merges, US1 is complete and demoable end to end with no token, no network
 call and no model call.
 
-## Design Input — stop and ask before building any visual surface
+## Design Input — the designs are delivered; build against them
 
-Mid-fidelity designs for these screens are being produced separately and were not available
-when this plan was written. **Before writing the first presentation component in this
-chunk, stop and ask the user for them**, naming the screens this chunk needs:
+Mid-fidelity designs for this chunk's screens are committed at
+`plans/2026-09-20-project-grain-prototype/design/mid-fi.pdf`. Read
+`plans/2026-09-20-project-grain-prototype/design/README.md` first — it indexes the pages and
+lists the decisions the designs settled that override what this plan said when it was
+written.
 
-- Level 2 change cluster nodes, including how the approach note is presented
-- The fallback treatment for a change whose enrichment failed
-- Level 3 step chain
-- The breadcrumb
-- The onboarding walkthrough
-- The expanded-package empty state
+This chunk needs pages 5 (Level 2 changes), 6 (Level 3 steps), and 9 (onboarding tour).
 
-
-Do the non-visual work first — it does not depend on the designs and is the bulk of the
-chunk:
-
-- the package-level and step-level derivation and their specs (T001–T004)
-
-
-Then ask, and wait. When the designs arrive, build against them: they are authoritative
-over any layout, spacing, hierarchy or wording this plan describes, and where they
-contradict it, **the designs win** — record the contradiction in the completion report so
-the plan can be corrected rather than silently diverging.
-
-If the user says to proceed without them, say so explicitly in the completion report and
-build to this plan's written description, keeping the components structured so a later
-restyle does not require re-deriving behaviour.
+**Open those pages before writing a presentation component.** Where a design contradicts
+this plan's description of layout, hierarchy, wording or interaction, **the design wins** —
+record the contradiction in the completion report so the plan gets corrected rather than
+silently diverging. Do not implement a screen you have not looked at.
 
 ## Acceptance Criteria
 
@@ -73,7 +59,13 @@ restyle does not require re-deriving behaviour.
   the pull request's own title and is distinguishable from a change with a real label —
   never a blank node.
 - Given a change node, When it is expanded, Then its steps render as an ordered
-  left-to-right chain, each step naming the files it covers.
+  left-to-right chain, each step naming the files it covers, the lines added and removed,
+  and a link to the change on GitHub.
+- Given a change that reached the expanded package, When its steps render, Then the first
+  step whose files are owned by that package is marked as the entry point and named in a
+  line beneath the chain.
+- Given the expanded package level, When it renders, Then the other packages with activity
+  in the range are listed alongside, each reachable without collapsing first.
 - Given any level, When the breadcrumb is read, Then it shows the path from the repository
   through the package to the change, and each segment returns to that level when activated.
 - Given the keyboard alone, When a node is focused, Then it can be expanded and collapsed
@@ -99,9 +91,19 @@ which in the completion report.
 
 ### 2. The nodes
 
-A change node and a step node, both custom React Flow nodes built from the shadcn primitives
-chunk 01 installed. The change node's layout should let the approach note be read without
-another click — it is a sentence, so give it room rather than truncating it to a chip.
+Level 2 is a **card list anchored to the expanded package**, not a graph of pull-request
+nodes: the package card sits at the left, the change cards run down the middle with
+connectors back to it, and an `Also touched` sidebar lists the other packages with activity
+in the range so the owner can move sideways without collapsing. The approach note is a
+sentence and the cards exist to give it room — never truncate it to a chip.
+
+Level 3 is the ordered step chain. Each step card carries its files, the lines added and
+removed, and a link to that change on GitHub.
+
+**Mark the step where the change entered the expanded package**, and state it beneath the
+chain ("Step 3 is where this change entered `render-engine`"). This is derived, not model
+output: it is the first step whose files are owned by the expanded package. It is the
+sharpest thing on the screen — it answers *where did this reach me* without reading a diff.
 
 A change whose enrichment is missing or marked failed renders the pull request title and is
 visibly distinct from an enriched one. Decide the treatment and say what it is; the rule is
@@ -132,7 +134,8 @@ An empty state for an expanded package with no changes in the range, distinct fr
       or failed enrichment yields a record carrying the pull request title and a flag marking
       it as a fallback; fails because the function does not exist
 - [ ] T003 — write failing spec for step derivation — asserts ordered steps with their files
-      for a pull request; fails because the function does not exist
+      and line counts, and that the entry-point step for a given package is the first step
+      whose files that package owns; fails because the function does not exist
 - [ ] T004 — edit the derivation module from chunk 04 — add package-level and step-level
       derivation
 - [ ] T005 [P] — create the change node component — label, metadata, spanned packages,
