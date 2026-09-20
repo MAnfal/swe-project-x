@@ -396,6 +396,14 @@ export function GrainWorkspace({ entries, snapshots }: GrainWorkspaceProps) {
               else is analyzed on demand.
             </p>
           </div>
+
+          <p className="mt-10 border-t pt-5 text-sm text-muted-foreground">
+            Reviewing this as a take-home?{' '}
+            <a href="/submission" className="font-medium text-foreground underline underline-offset-4">
+              Resources and execution history
+            </a>{' '}
+            — the design rationale, the brainstorm it came from, and all eight build transcripts.
+          </p>
         </div>
       </main>
     );
@@ -446,6 +454,12 @@ export function GrainWorkspace({ entries, snapshots }: GrainWorkspaceProps) {
             {view.changeCount} {view.changeCount === 1 ? 'change' : 'changes'} · {view.touchedCount} of{' '}
             {view.packageCount} packages touched
           </p>
+          <a
+            href="/submission"
+            className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Submission
+          </a>
           <Button
             variant="outline"
             size="icon-sm"
