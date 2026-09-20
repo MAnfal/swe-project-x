@@ -157,26 +157,26 @@ whose files sit outside any package.
 
 ### Tasks
 
-- [ ] T001 — write failing spec for topology discovery — asserts nodes from workspace
+- [x] T001 — write failing spec for topology discovery — asserts nodes from workspace
       directories and an edge from a declared workspace dependency; fails because no
       topology module exists
-- [ ] T002 — write failing spec for attribution — asserts direct, indirect-with-path, and
+- [x] T002 — write failing spec for attribution — asserts direct, indirect-with-path, and
       the direct-wins-over-indirect rule; fails because no attribution module exists
-- [ ] T003 — write failing spec for boundary validation — asserts a `__proto__` package
+- [x] T003 — write failing spec for boundary validation — asserts a `__proto__` package
       name is rejected and a duplicate name is rejected; fails because no validation exists
-- [ ] T004 — write failing spec for determinism — asserts two ingests over the same fixture
+- [x] T004 — write failing spec for determinism — asserts two ingests over the same fixture
       serialize identically; fails because no ingest module exists
-- [ ] T005 [P] — create the snapshot schema module — Zod schema plus derived types
-- [ ] T006 [P] — create the GitHub client module — authenticated Octokit, pagination, and
+- [x] T005 [P] — create the snapshot schema module — Zod schema plus derived types
+- [x] T006 [P] — create the GitHub client module — authenticated Octokit, pagination, and
       the recursive tree request
-- [ ] T007 — create the topology module — `discoverTopology`
-- [ ] T008 — create the attribution module — file→package mapping, dependency closure,
+- [x] T007 — create the topology module — `discoverTopology`
+- [x] T008 — create the attribution module — file→package mapping, dependency closure,
       direct and indirect sets
-- [ ] T009 — create the ingest entry point — window and bound arguments, returns a
+- [x] T009 — create the ingest entry point — window and bound arguments, returns a
       schema-valid snapshot
-- [ ] T010 — capture real API responses into a committed fixture and wire the specs to them
-- [ ] T011 — create the ingest CLI script
-- [ ] T012 — create `completion-report.md` in this chunk directory
+- [x] T010 — capture real API responses into a committed fixture and wire the specs to them
+- [x] T011 — create the ingest CLI script
+- [x] T012 — create `completion-report.md` in this chunk directory
 
 Judgment calls to explain in the completion report:
 
@@ -287,20 +287,20 @@ it back.
 
 ## Deliverables
 
-- [ ] `completion-report.md` in this directory, **committed**, written from
+- [x] `completion-report.md` in this directory, **committed**, written from
       `.claude/resources/templates/completion-report.md`
-- [ ] A Zod snapshot schema with derived types, `enrichment` optional
-- [ ] Deterministic ingest: topology, merged pull requests, direct and indirect attribution
-- [ ] Boundary validation on every repository-derived key
-- [ ] A committed fixture of captured GitHub API responses
-- [ ] A CLI that writes a snapshot for a repository and window
-- [ ] "project.md deltas" section in the completion report listing any architecture fact
+- [x] A Zod snapshot schema with derived types, `enrichment` optional
+- [x] Deterministic ingest: topology, merged pull requests, direct and indirect attribution
+- [x] Boundary validation on every repository-derived key
+- [x] A committed fixture of captured GitHub API responses
+- [x] A CLI that writes a snapshot for a repository and window
+- [x] "project.md deltas" section in the completion report listing any architecture fact
       this chunk changed, for the lead to apply at the wave boundary
 
 ## Artifacts Checklist
 
-- ☐ New tests for new behavior
+- ☑ New tests for new behavior
 - — Existing tests updated (no prior behavior)
-- ☐ Docs / conventions updated for changed behavior
+- ☑ Docs / conventions updated for changed behavior (reported as project.md deltas; this chunk may not edit the file)
 - — Generated code re-run (no codegen)
-- ☐ `.claude/resources/project.md` — report deltas; do not edit the file in this chunk
+- ☑ `.claude/resources/project.md` — 11 deltas reported; file not edited, per the chunk constraint

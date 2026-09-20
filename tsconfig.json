@@ -10,6 +10,10 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    // `scripts/ingest.mts` runs under bare Node, which strips types but does not read
+    // tsconfig `paths`. Modules under src/lib therefore import each other by relative
+    // specifier with an explicit extension, which TypeScript only allows with this on.
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
