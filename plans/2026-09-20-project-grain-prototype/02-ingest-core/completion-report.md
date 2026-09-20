@@ -103,7 +103,8 @@ The 3 passing were the pre-existing `utils.test.ts` baseline.
 | `github.test.ts` (16 tests) | `Cannot find package '@/lib/ingest/github'` — 0 tests | pass |
 | `transcript.test.ts` (16 tests) | `Cannot find package '@/lib/ingest/transcript'` — 0 tests | pass |
 
-Green: `pnpm test` → `Test Files 7 passed (7) / Tests 84 passed (84)`, exit 0.
+Green: `pnpm test` → `Test Files 7 passed (7) / Tests 90 passed (90)`, exit 0.
+(84 at review iteration 1; +6 from the fixes in § Review iteration 1.)
 
 **Two of these tests failed on first implementation and caught real defects**, which is
 the evidence they check something beyond import resolution:
@@ -190,6 +191,43 @@ Checked each of the three fixes against what I actually delivered:
 | Code sample: `enrichment: filled by chunk 03 …` → `… model-generated labels …` | **Not copied.** `grep -rniE 'chunk[ -]?0?[0-9]' src/ scripts/` returns nothing; `snapshot.ts` says "Written by the enrichment pass, keyed by merge commit SHA" |
 
 The full gate block was re-run end to end after these corrections: `rc=0`.
+
+## Review iteration 1 — three tests that could not fail
+
+The reviewer mutation-tested rather than trusting the red run: 29 mutants, 20 caught, 9
+survived. Three survivors were blocking, because the guarantee each was meant to protect
+had no test that could fail. The red run proved the suites *ran*; it could not prove they
+*discriminated*. All three are fixed against values the committed fixture already carried
+— no re-recording, no behaviour change.
+
+| Mutant | Why it survived | Fix | Confirmed fatal |
+| ------ | --------------- | --- | --------------- |
+| `JSON.stringify(sortKeysDeep(s))` → `JSON.stringify(s)` (`snapshot.ts:179`) | The only test fed both sides through `snapshotSchema.parse`, which rebuilds `z.object` fields in schema order before the serializer sees them | Assert over an `enrichment` record with keys inserted out of alphabetical order — zod does **not** normalise `z.record` order, so that is the case `sortKeysDeep` actually carries. Plus depth and top-level-order assertions | Kills 3 tests |
+| `deletions: file.deletions` → `deletions: 0` (`ingest.ts:130`) | Both assertions checked `Number.isInteger`, not the value, though 35 files in the fixture have non-zero deletions | Assert the real captured pairs — `.changeset/dirty-areas-leave.md` `[0,5]`, `packages/react/CHANGELOG.md` `[14,0]`, `packages/react/package.json` `[1,1]` — plus the 35/45 column totals | Kills 1 test |
+| drop `matched.sort(compareByMergeRecency)` (`github.ts:148`) | The captured listing already arrives newest-merge-first, so the test's own name was false of the fixture | Renamed to drop the false clause, and added runs against the same captured pull requests with the listing pages reversed. Real objects, permuted order — the variable under test | Kills 3 tests, at both the client and ingest layers |
+
+**Why the serializer one mattered most.** `enrichment` is a `z.record` keyed by merge SHA,
+no snapshot in this chunk has one, and gate 4 therefore cannot catch its ordering either.
+Chunks 03 and 06 both write it; the moment they do, determinism rests on `sortKeysDeep`.
+The new test pins the zod asymmetry explicitly, so an upgrade that changes it fails loudly
+rather than silently removing the need for the sort.
+
+Also in this iteration:
+
+- **`scripts/ingest.ts` → `scripts/ingest.mts`** in three places: `tsconfig.json:13`,
+  the run instructions at `scripts/ingest.mts:10`, and the `USAGE` string at `:32` — the
+  last printed to the user on every argument error, so a reader who copied it got `ENOENT`.
+  (This is the stale comment I flagged to the lead rather than fixing when asked not to
+  change code; it is fixed now.)
+- **T005 and T006 ticked** in `plan.md`; both modules existed and were tested.
+- **`transcript.ts` header record and `scripts/ingest.mts` argv record** built on
+  `Object.create(null)`. Neither is repository-derived nor reaches a snapshot record, so
+  neither was a rubric failure — but both are the shape the chunk's own SOP names.
+- **`review.md` committed**; it was untracked.
+
+Warnings 1, 2, 5 and 6 left alone on the reviewer's and the lead's instruction: two want
+fixture work belonging to a later chunk, and two are `project.md` edits this chunk may not
+make (they are deltas 2 and 4 in § project.md deltas).
 
 ## Judgment calls
 
