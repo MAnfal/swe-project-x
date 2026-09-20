@@ -650,6 +650,96 @@ useless for a 16× one. If the method can be off by an order of magnitude, eithe
 properly or hand over the *query* rather than the result and let the implementer run it.
 
 
+### Wave 3 → Wave 4 boundary
+
+Wave 3 closed with both PRs merged (#3 at `45866bf`, #4 at `30b90ee`). Merged tree
+re-verified by the lead, type check last: `pnpm lint` 0, `pnpm test`
+`Test Files 12 passed (12) / Tests 202 passed (202)`, `pnpm build` 0, `pnpm typecheck` 0.
+Level 1 driven in a browser against `pnpm start` — topology nodes, direct/indirect counts,
+dashed dependency edges, legend and the slider's volume histogram all render.
+
+#### Framework friction — batching `project.md` deltas to the lead corrupts the file it protects
+
+**The friction.** Chunk 04 reported eight `project.md` deltas and, as instructed, edited
+nothing. Applying them at this boundary, I found the Layout section already broken from the
+*previous* application: the generic `lib/` description — "Standalone functions over plain
+objects… Co-located `*.test.ts`" — was sitting indented under `snapshots/`, reading as a
+description of the snapshot directory. `src/lib/ingest/` and `src/lib/view/` were absent
+entirely, though both have existed since chunk 02 and chunk 04 respectively.
+
+Traced with `git log -L 339,347:.claude/resources/project.md`: the orphaning was introduced
+by `539c42c`, the lead applying **chunk 03's** deltas at the wave-3 dispatch. Inserting the
+`ai/` and `snapshots/` rows above the generic paragraph pushed it under a child entry, and
+nothing re-anchored it. Two waves of implementers then read a Layout block whose `lib/` rule
+was attached to the wrong directory.
+
+**The cause.** Not carelessness at the keyboard — a role assignment. This plan's
+Plan-Specific Constraint says chunks 02–06 *record* deltas in their completion report and
+"the lead applies them when the wave merges", with a real justification: two chunks in one
+parallel wave editing `project.md` is a merge conflict. But
+`.claude/resources/project.md` § "How this file stays current" states the opposite rule in
+its own table — *"During a chunk that changes an architecture fact | The implementer, **in
+the same chunk**"* — and explains why: a stale Convention Map feeds `generate-chunk-rubric`
+for the next chunk.
+
+The plan overrode a documented convention for a good reason and inherited a cost nobody
+priced. An implementer editing the Layout block has the directory open and knows where its
+own module goes. The lead, applying eight bullets from a report a chunk later, is
+transcribing prose into a structure it is not currently looking at — which is exactly the
+edit that silently reparents a paragraph. The constraint solved a merge conflict by creating
+a transcription step, and transcription is where this kind of drift lives.
+
+**The fix.** Both files are right about their own half, so the fix is to scope the override
+rather than pick a winner. In the plan template's Plan-Specific Constraints guidance, when a
+plan defers `project.md` edits to the lead for parallel-wave safety, require that the
+deferral name *which sections* are contested. Only sections a parallel wave could both touch
+(Stack, Commands) need batching; **Layout, Convention Map and Conventions are
+append-or-amend-in-place and rarely collide**, so chunks should edit those directly in-chunk
+per the standing rule. And whichever role applies them, the boundary check in
+`prompts/execute.md` § Step 6.3b should say explicitly that verifying `project.md` includes
+**re-reading the sections this wave edited as a whole**, not just confirming the new facts
+are present — presence is what I checked at the last boundary, and presence was true while
+the structure was wrong.
+
+#### Tribal knowledge — snapshots reach the build through generated static imports
+
+**The decision.** Committed snapshots under `src/lib/snapshots/` are reached through
+`src/lib/view/catalog.ts`, which imports a *generated* index
+(`catalog.generated.ts`, written by `scripts/build-snapshot-index.mts` and run as
+`prebuild`) consisting of one static `import` per snapshot file.
+
+**The obvious alternative.** Read the directory — `fs.readdirSync('src/lib/snapshots')` — or
+glob it. That is what the code's shape suggests, and it needs no generator, no committed
+generated file, and no spec asserting the generated file is current.
+
+**The constraint that made it right.** A source directory nothing imports is not carried
+into the build output, and the deployment target has no readable source tree at request
+time. Verified by the lead on the merged tree: `find .next -path '*snapshots*' -name
+'*.json'` returns nothing, while a snapshot's merge SHA (`0a1f9575…`) does appear inside
+`.next/server/chunks/ssr/src_00jhk_s._.js`. The static imports are what pull the data into
+the bundle at all; a directory read would work in `pnpm dev` and return nothing in
+production.
+
+**The recognition signal.** You add a snapshot to `src/lib/snapshots/` and it does not
+appear in the picker, or you are tempted to "simplify" `catalog.ts` by replacing the
+generated index with a directory read. `src/lib/view/catalog.test.ts` is the tripwire — an
+unindexed snapshot file makes it report `Tests 1 failed | 4 passed`. Canary re-run by the
+lead at this boundary to confirm the tripwire still fires. Promoted to `project.md`
+§ Conventions.
+
+#### Carry-forward claims re-derived for wave 4
+
+- **Chunk 05's inputs exist as described.** `src/lib/view/` holds `derive.ts`, `layout.ts`,
+  `catalog.ts`, `catalog.generated.ts` and `fixture.ts`; `src/components/canvas/` holds the
+  six components chunk 04 shipped. Chunk 05 builds Levels 2 and 3 on top of these.
+- **Four snapshots are committed and indexed**, not the one the plan assumed at writing
+  time: `shadcn-ui-ui-2026-06-22`, `trpc-trpc-2026-06-22`, `xyflow-xyflow-2026-06-22`,
+  `xyflow-xyflow-2026-08-31`. Three carry enrichment; `xyflow-xyflow-2026-08-31` is chunk
+  04's deliberately un-enriched fixture.
+- **The enrichment-completeness invariant changed shape at chunk 04's merge.** Absent
+  `enrichment` means un-enriched fixture; present means it must be complete. Chunk 05 must
+  not assume every catalog entry has enrichment — Level 2 renders one that does not.
+
 ---
 
 ## Cold-start brief
