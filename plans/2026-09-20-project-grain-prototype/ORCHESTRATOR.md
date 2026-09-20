@@ -202,6 +202,19 @@ for judgment calls. Amend in place with a dated note if one changes mid-executio
     Note for implementers: Haiku 4.5 is not an Opus-family model. `output_config.effort`
     errors on it, and its context window is 200K rather than 1M.
 
+    **Resolved 2026-09-20, after the bake — the decision holds and the trigger did not fire.**
+    236 pull requests enriched across the three repositories: 322,449 input / 32,742 output
+    tokens, **$0.49** against $2.43 for the same payload on Opus 5. The lead read nine baked
+    `approach` notes spanning all three repositories and judged them genuine method rather
+    than restatement — e.g. *"Inlined the work of updateAbsolutePositions directly into
+    updateNodeInternals to avoid iterating the nodeLookup twice"* (xyflow#5972), and
+    *"Registered an abort event listener on the operation's signal that completes the
+    observer, triggering existing teardown logic"* (trpc#7434). The notes that do read as
+    restatement are all dependency bumps and release-bot pull requests, which have no approach
+    to describe — that is a property of the input, not of the model. Chunk 03 independently
+    reached the same conclusion and correctly declined to escalate on its own. **Do not
+    re-open this without new evidence.**
+
 
 ### Complexity
 

@@ -160,29 +160,29 @@ Choose a window per repository that contains enough merged pull requests to be w
 scrubbing and few enough to bake affordably. State the windows and the resulting sizes in
 the completion report.
 
-**Measured by the lead on 2026-09-20 — start from these rather than guessing.** Merged pull
-requests counted backwards from 2026-09-20:
+**Measured by the lead on 2026-09-20, corrected the same day.** Merged pull requests in
+2026-06-22..2026-09-20, counted with the GitHub **search** API (`is:pr is:merged merged:A..B`),
+which returns an exact `total_count`:
 
-| Repository | 30d | 90d | 180d |
-| ---------- | --- | --- | ---- |
-| `xyflow/xyflow` | 17 | 67 | 68 |
-| `shadcn-ui/ui` | 13 | 13 | 13 |
-| `trpc/trpc` | 32 | 36 | 41 |
+| Repository | Merged in the 90-day window |
+| ---------- | --------------------------- |
+| `xyflow/xyflow` | 118 |
+| `shadcn-ui/ui` | 212 |
+| `trpc/trpc` | 36 |
 
-**Treat these as lower bounds, not exact counts.** The probe listed closed pull requests
-sorted by `updated` and capped at 6 pages per repository, so a repository that closes many
-pull requests without merging them — `shadcn-ui/ui` especially — can have merged ones beyond
-the sampled range. Re-measure the window you actually pick before baking it.
+**An earlier version of this section carried 67 / 13 / 36 and was wrong.** That probe listed
+*closed* pull requests sorted by `updated` and capped at 6 pages. In a repository with a large
+backlog of closed-but-unmerged pull requests that keep receiving comments — `shadcn-ui/ui`
+especially — the most-recently-*updated* closed pull requests are dominated by old unmerged
+ones, so the sample contained almost no recent merges. It under-reported `shadcn-ui/ui` by 16×
+and happened to be exact for `trpc/trpc`, whose backlog is small. The lesson generalizes: **to
+count merges in a window, ask the search API with `is:merged merged:A..B`; do not sample the
+`pulls` listing and filter.** Sorting by `updated` does not sample recency of *merge*.
 
-Two things this settles. **A one-week window is far too narrow**: a real ingest of
-`trpc/trpc` over 2026-09-01..2026-09-08 returned exactly **1** pull request, which is not
-worth scrubbing. And **90 days is a sensible starting point for all three**, putting the
-whole bake somewhere near 120 pull requests — about a dollar at Haiku 4.5 rates, so cost is
-not the binding constraint on window size here; legibility of the slider is.
-
-`shadcn-ui/ui` is the weak one. If a 90-day window still yields ~13, either widen it until
-the slider has something to show or say in the completion report why the repository stays in
-the set at that size.
+One conclusion from the original probe still holds and was confirmed by a real ingest: a
+one-week window is useless — `trpc/trpc` over 2026-09-01..2026-09-08 returned exactly **1**
+pull request. A 90-day window is right for all three, and the binding constraint is the
+`DEFAULT_MAX_PULL_REQUESTS` ceiling rather than repository quietness.
 
 The committed snapshots are **captured output of this pipeline**, never hand-edited
 afterwards. If a snapshot needs to change, re-bake it.
