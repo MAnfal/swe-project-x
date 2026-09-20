@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Grain
 
-## Getting Started
+See what happened in your packages while you weren't looking — and how each change was
+built.
 
-First, run the development server:
+Grain reads a TypeScript monorepo's merged pull requests over a window and draws three
+levels: the package topology with what was touched, the changes that reached one package,
+and the ordered steps that produced one change. It ships with pre-analyzed snapshots and
+can analyze any public GitHub repository on demand.
+
+## Running locally
+
+Requires Node.js 24 (`.mts` scripts run under bare Node) and pnpm 9.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env.local   # then fill it in — see below
+pnpm dev                     # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`pnpm dev` is enough to browse the committed snapshots: they are static imports in the
+bundle, so the landing page needs no network request, no database and no credential. The
+environment variables below are needed only for live analysis and on-demand enrichment.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+To exercise what actually deploys — the static prerender plus the client chunks that ship
+— run the production build instead:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm build && pnpm start
+```
 
-## Learn More
+### Environment variables
 
-To learn more about Next.js, take a look at the following resources:
+Both are read **only** inside route handlers (`src/app/api/**/route.ts`) and the scripts
+under `scripts/`. Neither is ever exposed to the browser, and neither is prefixed
+`NEXT_PUBLIC_`. `.env.local` is gitignored.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable | Required for | Notes |
+| -------- | ------------ | ----- |
+| `GITHUB_TOKEN` | Live analysis (`/api/analysis`) and the ingest CLI | A classic or fine-grained token with public-repository read access is enough. Without it the app still serves the committed snapshots; live analysis answers with a clear error. |
+| `ANTHROPIC_API_KEY` | On-demand enrichment (`/api/enrichment`) and `scripts/ingest.mts --enrich` | Spends money: one model call per pull request the reader expands. Without it a change node falls back to the pull request's own title rather than going blank. |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Two optional settings bound a live analysis. Both have defaults and neither is a
+credential:
 
-## Deploy on Vercel
+| Variable | Default | Notes |
+| -------- | ------- | ----- |
+| `GRAIN_ANALYSIS_WINDOW_DAYS` | `90` | How far back a live analysis looks. Whole number, 1–365. |
+| `GRAIN_MAX_PULL_REQUESTS` | `100` | The ceiling on pull requests analyzed, applied before any fetch starts. Whole number, 1–500. |
+| `ENRICHMENT_MODEL` | `claude-haiku-4-5` | The model on-demand enrichment and the bake command use. |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+A value that is present but unusable makes the route fail loudly rather than silently
+falling back to the default.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Commands
+
+| Command | What it does |
+| ------- | ------------ |
+| `pnpm dev` | Development server on http://localhost:3000 |
+| `pnpm build` | Production build. Regenerates the snapshot index first (`prebuild`) |
+| `pnpm start` | Serves the production build |
+| `pnpm test` | Vitest, once |
+| `pnpm lint` | ESLint over the project |
+| `pnpm typecheck` | `tsc --noEmit` |
+
+Baking a new committed snapshot (spends money — one model call per pull request):
+
+```bash
+node scripts/ingest.mts --repo <owner/repo> \
+  --since <iso> --until <iso> \
+  --out src/lib/snapshots/<owner>-<repo>-<since-date>.json --enrich
+```
+
+## Deploying
+
+The app targets a serverless host with no writable filesystem and no git binary at request
+time — Vercel is what it was built against. Nothing depends on either: ingest is GitHub
+API work, and the committed snapshots are static imports rather than files read at
+runtime.
+
+1. Import the repository into the host and let it detect Next.js. The default
+   `pnpm build` / `pnpm start` pipeline is correct; no custom build command is needed.
+2. Set `GITHUB_TOKEN` and `ANTHROPIC_API_KEY` as **server-side** environment variables for
+   the environments you want live analysis in. Do not prefix either with `NEXT_PUBLIC_`.
+3. Optionally set `GRAIN_ANALYSIS_WINDOW_DAYS` and `GRAIN_MAX_PULL_REQUESTS` to narrow the
+   work a single request may do.
+
+Both API routes declare `export const runtime = 'nodejs'` — Octokit and the AI SDK do not
+run on the Edge runtime — and an explicit `maxDuration`: 300 seconds for `/api/analysis`,
+which is the ceiling Vercel's free tier allows and cannot be raised there, and 60 for
+`/api/enrichment`, which is one model call.
+
+**There are no background jobs.** A live analysis runs inside the request that asked for
+it. Closing the tab ends it, a retry starts it over, and nothing is queued, stored or
+resumed. The enrichment cache is in-memory and lives only as long as the serving instance
+that holds it — a cold instance re-asks the model, which is a normal miss and not an
+error.
+
+## How work happens here
+
+Non-trivial changes run through the spec-driven loop in `.claude/`. Read
+`.claude/README.md` for the loop and `.claude/resources/project.md` for the stack,
+commands, principles and conventions a reviewer will cite.
