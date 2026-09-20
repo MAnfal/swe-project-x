@@ -41,7 +41,7 @@ See `SPEC.md` in this directory.
 | 02 | US1 | Merged | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
 | 03 | US1 | Merged | [#3](https://github.com/MAnfal/swe-project-x/pull/3) | — |
 | 04 | US1 | Merged | [#4](https://github.com/MAnfal/swe-project-x/pull/4) | — |
-| 05 | US1 | Not started | — | — |
+| 05 | US1 | In progress | — | — |
 | 06 | US2 | Not started | — | — |
 
 Every chunk names the story it serves. A chunk that serves no story is either scaffolding
@@ -106,6 +106,8 @@ When every chunk is `Merged`, run `/plan:complete`.
 
 | 2026-09-20 | `preflight_failed` | 05 | Wave 4 preflight halted on three defects, all from the design amendment being applied to some sections of chunk 05 and not others. (a) The plan contradicted itself on Level 2: Context, all four relevant acceptance criteria, tasks T005/T006, the Reuse Audit and the Deliverables said "node", while § "The nodes" and the design README say a **card list anchored to the package, not a graph of pull-request nodes** (design page 5, Design Decision 8). (b) The rubric carried both vocabularies — items graded "exactly one node per pull request" and "Level 2 presents changes as cards" simultaneously, so a correct implementation fails one of them whatever it builds. (c) Gate 2 resolved its target with `git ls-files \| grep -iE 'change.*node.*\.tsx$'` and exits 1 with "no change node component found" — it hunts for a filename the design tells the implementer not to create, so it fails on correct work. All three fixed; base freshness clean (0 behind `origin/main`), all six reference paths resolve, worktrees clean |
 | 2026-09-20 | `rubric_regenerated` | 05 | Regenerated against the Convention Map per the standing Plan-Specific Constraint — it had never been run for 05. Injected the `src/components/**/*.tsx`, `src/components/ui/**`, `src/lib/**/*.ts`, test-convention and manifest rows (~20 items → ~40). Bible citations stay at 2, correctly: every matching row except the test rows carries `Doc: —`, and the skill forbids inventing a page. Folded in two wave-3 carry-forwards under Step 6.5 — a constructed-input test per defensive branch (the failure mode that sank the first review of 02, 03 and 04, in the same file 05 extends), and Level 2 rendering a snapshot with no `enrichment` key at all |
+| 2026-09-20 | `wave_started` | — | Wave 4 — preflight clean after the three chunk-05 fixes: plan branch 0 behind `origin/main`, all nine dispatch-brief paths resolve in the worktree, worktrees swept |
+| 2026-09-20 | `chunk_dispatched` | 05 | Worktree `.worktrees/05-canvas-levels` on `feat/project-grain-prototype--canvas-levels` from `0914657`; bootstrapped with `pnpm install`, all four gates verified green in it before dispatch (lint 0, `Tests 202 passed (202)` / 12 files, build 0, typecheck 0). No credential needed — Levels 2 and 3 render committed snapshots offline. Brief carries the two data carry-forwards (one of four snapshots has no `enrichment` key; the invariant is absent-or-complete) and the constructed-input mutation requirement, since 05 extends the same `derive.ts` whose guards survived chunk 04's review |
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
 `wave_merged`, `plan_delivered`.
