@@ -11,8 +11,11 @@ import {
   parseRepositoryRef,
 } from '@/lib/ingest/github';
 
+import { replayFetch } from '@/lib/ingest/transcript';
+
 import {
   clientFor,
+  loadTranscript,
   MISSING_FILE_TRANSCRIPT,
   replayClient,
   transcriptWithReversedListing,
@@ -64,6 +67,44 @@ describe('createGitHubClient', () => {
     // falling back to process.env.
     expect(() => createGitHubClient({ token: '' })).toThrow(/token/i);
   });
+
+  it('builds a working client from a token alone, with no request overrides', () => {
+    // The `Object.keys(request).length > 0` branch: neither `fetch` nor `signal` given.
+    expect(() => createGitHubClient({ token: 'a-token' })).not.toThrow();
+  });
+
+  it('puts the abort signal on every request the client makes', async () => {
+    // Asserted on what `fetch` actually receives, not on the constructor's arguments —
+    // the claim is that a route handler's disconnect reaches the socket, and the only
+    // place that is observable is the request init.
+    const controller = new AbortController();
+    const seen: (AbortSignal | null | undefined)[] = [];
+
+    const recordingFetch: typeof fetch = async (input, init) => {
+      seen.push(init?.signal);
+      return replayFetch(loadTranscript())(input, init);
+    };
+
+    const client = createGitHubClient({
+      token: 'replay-token',
+      fetch: recordingFetch,
+      signal: controller.signal,
+    });
+    await fetchRecursiveTree(client, XYFLOW.ref, XYFLOW.branch);
+
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((signal) => signal === controller.signal)).toBe(true);
+  });
+
+  it('aborts an in-flight request when the signal fires', async () => {
+    const controller = new AbortController();
+    const client = createGitHubClient({ token: 'replay-token', signal: controller.signal });
+    controller.abort();
+
+    // The signal is already aborted, so `fetch` rejects before opening a socket — which
+    // is why this spec reaches no network despite using the real client.
+    await expect(fetchRecursiveTree(client, XYFLOW.ref, XYFLOW.branch)).rejects.toThrow();
+  });
 });
 
 describe('github fetchers over captured xyflow/xyflow responses', () => {
@@ -86,7 +127,7 @@ describe('github fetchers over captured xyflow/xyflow responses', () => {
   });
 
   it('lists only pull requests merged inside the window', async () => {
-    const prs = await fetchMergedPullRequests(replayClient(), XYFLOW.ref, {
+    const { pullRequests: prs } = await fetchMergedPullRequests(replayClient(), XYFLOW.ref, {
       since: XYFLOW.since,
       until: XYFLOW.until,
       maxPullRequests: 100,
@@ -100,7 +141,7 @@ describe('github fetchers over captured xyflow/xyflow responses', () => {
   });
 
   it('carries the incidental API fields a captured response has', async () => {
-    const prs = await fetchMergedPullRequests(replayClient(), XYFLOW.ref, {
+    const { pullRequests: prs } = await fetchMergedPullRequests(replayClient(), XYFLOW.ref, {
       since: XYFLOW.since,
       until: XYFLOW.until,
       maxPullRequests: 100,
@@ -126,8 +167,8 @@ describe('github fetchers over captured xyflow/xyflow responses', () => {
       XYFLOW.ref,
       bounds,
     );
-    expect(asCaptured.map((p) => p.number)).toEqual([5992, 5997, 5994, 5977, 5987, 5989]);
-    expect(reversed.map((p) => p.number)).toEqual(asCaptured.map((p) => p.number));
+    expect(asCaptured.pullRequests.map((p) => p.number)).toEqual([5992, 5997, 5994, 5977, 5987, 5989]);
+    expect(reversed.pullRequests.map((p) => p.number)).toEqual(asCaptured.pullRequests.map((p) => p.number));
   });
 
   it('applies the ceiling to the newest merges, after ordering', async () => {
@@ -136,7 +177,20 @@ describe('github fetchers over captured xyflow/xyflow responses', () => {
       until: XYFLOW.until,
       maxPullRequests: 3,
     });
-    expect(capped.map((p) => p.number)).toEqual([5992, 5997, 5994]);
+    expect(capped.pullRequests.map((p) => p.number)).toEqual([5992, 5997, 5994]);
+    // `matched` is what the window really held, so a caller can tell the ceiling fired.
+    // It counts the whole window, not the three that survived it.
+    expect(capped.matched).toBe(6);
+  });
+
+  it('reports the same match count whether or not the ceiling fired', async () => {
+    const bounds = { since: XYFLOW.since, until: XYFLOW.until };
+    const uncapped = await fetchMergedPullRequests(replayClient(), XYFLOW.ref, {
+      ...bounds,
+      maxPullRequests: 100,
+    });
+    expect(uncapped.matched).toBe(6);
+    expect(uncapped.pullRequests).toHaveLength(6);
   });
 
   it('fetches commits in the order the pull request records them', async () => {

@@ -26,9 +26,21 @@ type StepsLevelProps = {
   /** The next change under the same package, if there is one. */
   nextChange: { number: number; label: string } | null;
   onOpenChange: (number: number) => void;
+  /**
+   * True while this change's enrichment is being generated on demand — a live analysis
+   * arrives un-enriched, and "enrichment has not run" would be a lie for the few seconds
+   * it is running.
+   */
+  enriching?: boolean;
 };
 
-export function StepsLevel({ chain, packageName, nextChange, onOpenChange }: StepsLevelProps) {
+export function StepsLevel({
+  chain,
+  packageName,
+  nextChange,
+  onOpenChange,
+  enriching = false,
+}: StepsLevelProps) {
   const { change, steps } = chain;
 
   return (
@@ -55,8 +67,9 @@ export function StepsLevel({ chain, packageName, nextChange, onOpenChange }: Ste
           <p className="max-w-md flex-1 text-sm">
             {change.approach === null ? (
               <span className="text-muted-foreground italic">
-                No approach note — enrichment has not run for this change, so the heading above is the pull
-                request&apos;s own title.
+                {enriching
+                  ? 'Working out how this change was built…'
+                  : `No approach note — enrichment has not run for this change, so the heading above is the pull request's own title.`}
               </span>
             ) : (
               <>
@@ -77,7 +90,9 @@ export function StepsLevel({ chain, packageName, nextChange, onOpenChange }: Ste
           </span>
           <span className="text-xs text-muted-foreground">
             {steps.length === 0
-              ? 'No step chain — enrichment has not run for this change.'
+              ? enriching
+                ? 'Reading the commits…'
+                : 'No step chain — enrichment has not run for this change.'
               : `${steps.length} ${steps.length === 1 ? 'step' : 'steps'}, in the order they were built — not
                  commit order. Files are attributed to steps by package: the snapshot records changed files per
                  change, not per commit.`}
@@ -123,8 +138,9 @@ export function StepsLevel({ chain, packageName, nextChange, onOpenChange }: Ste
             </span>
           ) : steps.length === 0 ? (
             <span>
-              There is no step chain for this change, so there is no entry point to mark. Grain shows what
-              happened and stops there — no review, no score, no gate.
+              {enriching
+                ? 'Grain is working out the step chain for this change.'
+                : 'There is no step chain for this change, so there is no entry point to mark. Grain shows what happened and stops there — no review, no score, no gate.'}
             </span>
           ) : (
             // `directPackages` is derived from the files' owners (`attributePullRequest`) and
