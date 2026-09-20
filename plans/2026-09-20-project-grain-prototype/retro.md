@@ -141,6 +141,14 @@ Every one of these is a candidate for `.claude/resources/project.md`.
   writes only on paths reachable from a route handler — so a script that writes a snapshot
   file is legal and a `src/lib/` module that does the same is not. There is no Convention
   Map row for `scripts/**` yet; chunk 02 reports it as a `project.md` delta.
+- **A passing test suite is not evidence a guarantee is tested.** Chunk 02 shipped 84
+  green tests of which three could not fail; the reviewer found them by mutation, not by
+  reading. Before claiming a contract is covered, delete or invert the line that implements
+  it and confirm something goes red.
+- **`z.record` does not normalize key order** (measured on zod 4.6.5: `{"zzz","aaa"}`
+  parses to `["zzz","aaa"]`), so `enrichment` ordering depends entirely on `sortKeysDeep`
+  in `src/lib/snapshot.ts`. Chunk 03 is the first to populate `enrichment` and therefore
+  the first whose determinism actually rests on it.
 - **Fixtures belong under `src/**/fixtures/`.** The Convention Map row is
   `src/**/fixtures/**/*.json` and chunk 02's Gate 2 greps `git ls-files` for
   `fixtures?/.*\.json$`. A fixture placed outside `src/` matches neither the row nor the
@@ -211,6 +219,75 @@ Every one of these is a candidate for `.claude/resources/project.md`.
    artifact whose provenance is itself a graded property. The moment a principle says "real
    output of the real producer", the credential that reaches the real producer becomes a
    bootstrap requirement rather than a runtime concern.
+
+
+### Chunk 02 — Ingest core
+
+- **The implementer's self-reporting was unusually honest and worth keeping.** It flagged
+  an acceptance criterion as only *partly* met (the captured window cannot prove all three
+  merge strategies are present) rather than claiming it; it reported two of its own gates
+  as broken as written and falsified the replacements separately; and it caught a reuse
+  defect in its own work (`ownerFor()` duplicating `ownerOfFile()`) before committing. It
+  also noticed that its shell aliases `grep` to `ugrep --ignore-files`, which can pass by
+  reading nothing, and re-ran the Reuse Audit with `/usr/bin/grep`. None of that was asked
+  for by the brief.
+
+#### Framework friction — "tests seen failing" is satisfied by a red run that proves nothing
+
+1. **The friction.** Chunk 02's red run was textbook: six specs written before any
+   implementation, `pnpm test` exit 1, verbatim output in the report. Every universal
+   rubric item about observing tests red passed. But all six suites failed at **import**
+   with `Cannot find package '@/lib/…'` and **0 tests collected** — which proves the
+   modules were absent, not that a single assertion discriminates. The reviewer mutation
+   tested instead of trusting it: 29 plausible wrong implementations, 20 caught, **9
+   survived**. Three of the survivors were blocking, including one where deleting
+   `sortKeysDeep` — the entire key-ordering guarantee — left all 84 tests green. I
+   reproduced all three before acting on them.
+
+2. **The cause.** `CLAUDE.md` § Non-negotiables says *"Tests first, and seen failing. A
+   test that has never been observed red is not evidence that it checks anything."* The
+   templated rubric item in `.claude/resources/templates/rubric.md` operationalizes it as
+   *"The tests were observed failing before the implementation existed, and the report
+   shows the red run."* Both are satisfied in full by a suite that cannot compile. The
+   principle is about **discrimination**; the check written for it measures **absence**,
+   and tests-first ordering guarantees absence for free. So the check passes most loudly
+   exactly when it is least informative — at the moment the module does not exist yet.
+   Nothing downstream recovers it: `prompts/gates.md` grades gate falsifiability, which is
+   about the *gate*, not about whether an assertion inside a passing suite is load-bearing.
+
+3. **The fix.** Amend the Universal Check in `.claude/resources/templates/rubric.md` from
+   the current wording to: *"The tests were observed failing before the implementation
+   existed **for the right reason** — the report distinguishes a suite that failed to
+   import (which proves only that the module was absent) from an assertion that failed
+   against a wrong value. For any guarantee the chunk's plan calls a contract, the report
+   shows the assertion failing against a **plausible wrong implementation**, not against a
+   missing file."* Then add to `.claude/resources/prompts/evidence.md`: *"A red run from
+   tests-first ordering is necessary, not sufficient. `0 tests collected` is an import
+   error wearing a red run's clothes."* This is cheap for an implementer — it is one
+   deliberate mutation per contract, not a mutation-testing pass.
+
+#### Framework friction — the reviewer invalidated its own harness, and only caught it by luck
+
+1. **The friction.** The reviewer's first mutation-testing harness passed
+   `--reporter=basic`, which is not a Vitest 5 reporter. Every run exited 1, so **every
+   mutant looked caught** — a 29/29 "everything is tested" result that would have
+   confirmed a PASS. It noticed, discarded the run, and redid it. Had it not, the review
+   would have been confidently wrong in the direction of approving.
+
+2. **The cause.** `prompts/review.md` tells the reviewer to verify the implementer's
+   evidence but says nothing about validating the reviewer's **own** instrument. The
+   asymmetry is baked in: `prompts/gates.md` requires a negative control for every gate an
+   *implementer* writes — plant a canary, confirm it fires — and no equivalent obligation
+   exists for a tool the reviewer builds during the review. A harness where every run
+   fails is indistinguishable from a suite where every mutant is caught, and both look
+   like success.
+
+3. **The fix.** Add to `.claude/resources/prompts/review.md`, under the verification
+   section: *"If you build an instrument during the review — a mutation harness, a script,
+   a diff filter — validate it before trusting it. Run it once against an **unmutated**
+   tree and confirm it reports clean, and once against a mutation you are certain is
+   caught. An instrument that reports failure unconditionally is indistinguishable from
+   one reporting that everything is covered."*
 
 
 ---
