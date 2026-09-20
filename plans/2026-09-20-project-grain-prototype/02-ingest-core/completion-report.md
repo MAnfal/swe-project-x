@@ -103,8 +103,9 @@ The 3 passing were the pre-existing `utils.test.ts` baseline.
 | `github.test.ts` (16 tests) | `Cannot find package '@/lib/ingest/github'` — 0 tests | pass |
 | `transcript.test.ts` (16 tests) | `Cannot find package '@/lib/ingest/transcript'` — 0 tests | pass |
 
-Green: `pnpm test` → `Test Files 7 passed (7) / Tests 90 passed (90)`, exit 0.
-(84 at review iteration 1; +6 from the fixes in § Review iteration 1.)
+Green: `pnpm test` → `Test Files 7 passed (7) / Tests 94 passed (94)`, exit 0.
+(84 at review iteration 1, 90 after its fixes, 94 after iteration 2's — see the two
+review sections below.)
 
 **Two of these tests failed on first implementation and caught real defects**, which is
 the evidence they check something beyond import resolution:
@@ -228,6 +229,39 @@ Also in this iteration:
 Warnings 1, 2, 5 and 6 left alone on the reviewer's and the lead's instruction: two want
 fixture work belonging to a later chunk, and two are `project.md` edits this chunk may not
 make (they are deltas 2 and 4 in § project.md deltas).
+
+## Review iteration 2 — two unpinned guarantees
+
+Iteration 2 passed with no blocking issues, and confirmed the iteration-1 fixes
+generalize: eight *different* wrong implementations of the same three guarantees all die
+(shallow sort, sort-skips-arrays, `additions`→0, additions/deletions swapped, owner→null,
+ascending merge sort, cap-before-sort, reverse order). Two one-test gaps were left to
+close. I reproduced both as surviving mutants before writing anything.
+
+| Mutant | Why it survived | Fix | Confirmed fatal |
+| ------ | --------------- | --- | --------------- |
+| `DEPENDENCY_FIELDS` narrowed to `['dependencies']` (`topology.ts:16-21`) | No test asserted a `devDependencies`-derived edge, though the real fixture produces **6 of 13** — nearly half the graph, and chunks 04/05 draw them | A unit case for a workspace `devDependency`, and an assertion over the real topology that `@xyflow/react → @xyflow/tsconfig (devDependencies)` exists plus an exact kind census `{dependencies: 7, devDependencies: 6}` | Kills 2 tests. Also kills the narrower mutant that drops **only** `devDependencies` and keeps peer/optional |
+| drop `b.number - a.number` from `compareByMergeRecency` (`github.ts:155`) | The captured window has no two pull requests sharing a `merged_at`, so the tie-break is unreachable through the fixture | Exported the comparator and spec'd it directly: newer merge first, a same-timestamp tie broken by number with the higher first, never `0` for distinct pull requests, and a tied set sorting deterministically | Kills 2 tests. Also kills the **inverted** tie-break, which a "not zero" assertion alone would have missed |
+
+The count went to **94, not the 92 the lead projected** — the comparator warranted three
+cases rather than one, because "has a tie-break" and "has the *right* tie-break" are
+different claims and only the second protects determinism.
+
+`topology.test.ts:13`'s `manifest()` helper had a `devDeps` parameter no call site
+supplied — the same gap leaving a visible trace, as the reviewer noted. The new unit case
+is its first caller.
+
+**Why exporting `compareByMergeRecency` is the right shape here.** The alternative was to
+mutate two `merged_at` values in the transcript so a tie exists, which would have put
+fabricated data into a fixture whose whole purpose is being real captured output
+(Principle 4). A pure comparator with its own spec keeps the fixture honest; the wiring
+between comparator and `fetchMergedPullRequests` is already pinned by the reversed-listing
+tests from iteration 1.
+
+Left alone on instruction, and recorded by the lead rather than fixed: the five unasserted
+sorts, the unexercised page-level stop, `fixtures/replay.ts` without a spec, and gate 3's
+zsh sensitivity (the plan runs it inside `bash -s`, so it only bites a human running the
+line by hand).
 
 ## Judgment calls
 

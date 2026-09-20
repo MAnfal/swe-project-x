@@ -149,8 +149,17 @@ export async function fetchMergedPullRequests(
   return matched.slice(0, bounds.maxPullRequests);
 }
 
-/** Newest merge first; the pull-request number breaks ties so the order is total. */
-function compareByMergeRecency(a: RawPullRequest, b: RawPullRequest): number {
+/**
+ * Newest merge first; the pull-request number breaks ties so the order is total.
+ *
+ * Exported for its own spec: two pull requests merged in the same second are rare and the
+ * captured window contains none, so the tie-break is not reachable through the fixture.
+ * Without a total order two runs could order a tie differently and break determinism.
+ */
+export function compareByMergeRecency(
+  a: Pick<RawPullRequest, 'merged_at' | 'number'>,
+  b: Pick<RawPullRequest, 'merged_at' | 'number'>,
+): number {
   const byMerge = (b.merged_at ?? '').localeCompare(a.merged_at ?? '');
   return byMerge !== 0 ? byMerge : b.number - a.number;
 }

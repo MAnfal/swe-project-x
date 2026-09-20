@@ -72,6 +72,18 @@ describe('discoverTopology', () => {
     expect(topology.edges).toEqual([{ from: 'a', to: 'b', kind: 'dependencies' }]);
   });
 
+  it('creates an edge for a workspace dependency declared under devDependencies', () => {
+    const topology = discoverTopology({
+      manifests: [
+        { path: 'packages/a/package.json', text: manifest('a', {}, { b: 'workspace:*' }) },
+        { path: 'packages/b/package.json', text: manifest('b') },
+      ],
+    });
+    // The edge kind is kept so a consumer can tell build-time coupling from runtime,
+    // but a devDependency on a workspace package is still an edge.
+    expect(topology.edges).toEqual([{ from: 'a', to: 'b', kind: 'devDependencies' }]);
+  });
+
   it('creates no edge for a dependency that is not another node in this repository', () => {
     const topology = discoverTopology({
       manifests: [{ path: 'packages/a/package.json', text: manifest('a', { react: '^19.0.0' }) }],
@@ -117,5 +129,18 @@ describe('discoverRepositoryTopology over captured xyflow/xyflow responses', () 
     expect(topology.edges).toContainEqual({ from: 'svelte-examples', to: '@xyflow/svelte', kind: 'dependencies' });
     // `react` itself is an npm dependency of @xyflow/react, not a workspace package here.
     expect(topology.edges.filter((e) => e.to === 'react')).toEqual([]);
+
+    // Nearly half the real graph comes from devDependencies — 6 of 13 edges — and the
+    // canvas draws them. Dropping that field would silently halve the topology.
+    expect(topology.edges).toContainEqual({
+      from: '@xyflow/react',
+      to: '@xyflow/tsconfig',
+      kind: 'devDependencies',
+    });
+    const byKind = topology.edges.reduce<Record<string, number>>((acc, e) => {
+      acc[e.kind] = (acc[e.kind] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(byKind).toEqual({ dependencies: 7, devDependencies: 6 });
   });
 });

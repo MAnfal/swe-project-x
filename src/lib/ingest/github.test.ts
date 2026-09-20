@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  compareByMergeRecency,
   createGitHubClient,
   fetchMergedPullRequests,
   fetchPullRequestCommits,
@@ -30,6 +31,30 @@ describe('parseRepositoryRef', () => {
 
   it.each(['', 'xyflow', 'https://example.com/a/b', 'a/b/c/d'])('rejects %s', (input) => {
     expect(() => parseRepositoryRef(input)).toThrow();
+  });
+});
+
+describe('compareByMergeRecency', () => {
+  const pr = (number: number, merged_at: string) => ({ number, merged_at });
+
+  it('puts the newer merge first', () => {
+    expect(compareByMergeRecency(pr(1, '2026-08-31T00:00:00Z'), pr(2, '2026-09-01T00:00:00Z'))).toBeGreaterThan(0);
+    expect(compareByMergeRecency(pr(2, '2026-09-01T00:00:00Z'), pr(1, '2026-08-31T00:00:00Z'))).toBeLessThan(0);
+  });
+
+  it('breaks a same-timestamp tie by pull-request number, higher first', () => {
+    const at = '2026-08-31T09:22:57Z';
+    expect(compareByMergeRecency(pr(10, at), pr(20, at))).toBeGreaterThan(0);
+    expect(compareByMergeRecency(pr(20, at), pr(10, at))).toBeLessThan(0);
+    // Never 0 for distinct pull requests: without a total order, two runs can order a
+    // tie differently and the snapshot stops being byte-identical.
+    expect(compareByMergeRecency(pr(10, at), pr(20, at))).not.toBe(0);
+  });
+
+  it('sorts a tied set deterministically, highest number first', () => {
+    const at = '2026-08-31T09:22:57Z';
+    const sorted = [pr(5977, at), pr(5992, at), pr(5987, at)].sort(compareByMergeRecency);
+    expect(sorted.map((p) => p.number)).toEqual([5992, 5987, 5977]);
   });
 });
 
