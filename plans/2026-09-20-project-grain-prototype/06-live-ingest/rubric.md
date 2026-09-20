@@ -65,6 +65,8 @@ often as it passes a violation.
 - [ ] `Other…` swaps the dropdown in place for the URL input with a back arrow to its left;
       the arrow restores the dropdown and its previous selection
 - [ ] Failure states name what went wrong and leave the dropdown usable
+- [ ] No surface claims that analysis continues after the tab closes or that a retry resumes
+      partially fetched work; retry restarts, and no durable job state was introduced
 - [ ] No request-time dependency on a writable filesystem, a git subprocess, or a
       background worker
 - [ ] No test calls the real GitHub or model API, and assertions are on returned records —
@@ -75,6 +77,10 @@ often as it passes a violation.
 - [ ] The completion report states whether the mid-fi designs were supplied before the
       presentation components were built, or that the user directed the chunk to proceed
       without them; where the designs contradicted the plan, the contradiction is recorded
+
+- [ ] The screens this chunk builds match the committed mid-fi designs; any place the
+      designs contradicted the chunk plan is named in the completion report, with the
+      design followed rather than the plan
 
 ## Verdict
 

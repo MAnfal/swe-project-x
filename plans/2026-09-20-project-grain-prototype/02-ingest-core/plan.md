@@ -48,8 +48,10 @@ exact under every merge strategy.
   package B, When attribution runs, Then that pull request is recorded as reaching package
   A **indirectly, through B**, and the path is recorded.
 - Given the same snapshot inputs, When ingest runs twice, Then the two snapshots are
-  byte-identical after serialization — no timestamps, iteration order, or set ordering
-  leaks in.
+  byte-identical after serialization apart from the declared `metadata` block — iteration
+  order and set ordering do not leak in, and no timestamp appears outside `metadata`.
+- Given a pull request, When its files are recorded, Then each file carries the number of
+  lines added and removed, and each is attributed to the package that owns it.
 - Given a repository whose pull requests were merged by squash, by merge commit, and by
   rebase, When ingest runs, Then all three appear as pull requests with their commits
   attached.
@@ -71,8 +73,19 @@ argues for it, but record the change in the completion report because chunks 03�
 ```
 
 Required fields per pull request: number, title, body, author, merged timestamp, merge
-commit SHA, the ordered commit SHAs and messages, the changed file paths, the set of
-packages reached directly, and the set reached indirectly with the path that reached them.
+commit SHA, the ordered commit SHAs and messages, the changed files, the set of packages
+reached directly, and the set reached indirectly with the path that reached them.
+
+Each changed file carries its path and the lines added and removed. The designs render
+`+41 −0` per step and link each step to GitHub, and the pull-request files endpoint already
+returns `additions` and `deletions` per file — so this costs nothing extra to capture and
+cannot be recovered later without re-fetching.
+
+The snapshot also carries a top-level `metadata` block: the repository, the window, the
+analysis timestamp, and the package and pull-request counts. The repository picker renders
+"1,284 packages · analyzed 4 min ago" from it. **`metadata` is the only place a timestamp
+may appear**, and the determinism assertion excludes it — everything else must be
+byte-identical across runs.
 
 The `enrichment` field is declared here and left optional. Chunk 03 populates it; chunks
 04 and 05 must render a snapshot with it absent.
@@ -251,8 +264,9 @@ src=$(git ls-files 'src/**/*.ts' 'lib/**/*.ts' | tr '\n' ' ')
 hits=$(grep -hE "__proto__" $src | grep -vE '^\s*(//|\*)' | wc -l | tr -d ' ')
 [ "$hits" -ge 1 ] || { echo "FAIL: no reserved-key guard in source" >&2; exit 1; }
 
-# Gate 4 — ingest is deterministic. Run the pipeline twice over the fixture and diff.
-# Substitute the CLI invocation this chunk actually created.
+# Gate 4 — ingest is deterministic outside `metadata`. Run the pipeline twice over the
+# fixture, strip the metadata block from both outputs, and diff. Substitute the CLI
+# invocation this chunk actually created.
 GATE
 ```
 

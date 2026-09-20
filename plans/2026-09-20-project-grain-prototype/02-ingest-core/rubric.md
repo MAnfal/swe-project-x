@@ -63,6 +63,10 @@ often as it passes a violation.
       not that a mock was called or that an input literal round-tripped —
       `.claude/resources/bibles/swe/testing.md`
 - [ ] Ingest takes explicit window and count bounds; no code path fetches without a bound
+- [ ] Every changed file carries its added and removed line counts, captured at ingest
+      rather than recoverable only by re-fetching
+- [ ] A timestamp appears only inside the declared `metadata` block, and the determinism
+      assertion excludes that block and nothing else
 - [ ] The dependency closure is computed once per snapshot rather than per pull request
 - [ ] Topology discovery is a single function, not a provider or plugin interface built for
       a second ecosystem that is a stated non-goal

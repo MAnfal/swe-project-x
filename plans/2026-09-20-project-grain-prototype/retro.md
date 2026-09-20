@@ -1,7 +1,7 @@
 <!-- Copied into the plan directory at the start of execution.
      Part 1 is written continuously while executing. Part 2 is filled by plan-retro. -->
 
-# <Plan Name> — Retro
+# Project Grain — Codeowner Visibility Prototype — Retro
 
 ## Part 1: Execution Journal
 
@@ -52,6 +52,90 @@ Every one of these is a candidate for `.claude/resources/project.md`.
 - Observation
 - Observation
 ```
+
+---
+
+## 2026-09-20
+
+### Chunk 01 — Boilerplate
+
+- **Passed review on iteration 1.** The implementer independently falsified three of the
+  plan's own instructions rather than following them into a vacuous result, and said so.
+  Chunk shape worked: "boilerplate only, no product code" was unambiguous enough that
+  nothing crept in — the diff is scaffolder output plus one re-export plus `project.md`.
+
+- **The plan's verification gates had never been run, and two of the four were broken.**
+  Gate 3 asserted `.env`/`node_modules` are untracked, which is trivially true on an empty
+  base tree. Gates 1 and 2 invoked `pnpm test --run`, which pnpm's own CLI parser rejects
+  before the script starts. The implementer caught both and revised them; the reviewer
+  independently reproduced the `pnpm test --run` failure in a scratch directory with no
+  `package.json` at all, confirming it is pnpm's parser and not the project.
+
+#### Framework friction — a gate can fail on base for the wrong reason and nothing checks
+
+1. **The friction.** `pnpm test --run` exits non-zero on the base tree *and* on the
+   finished tree, with the identical error both times. It would have satisfied every
+   existing check for gate quality while proving nothing about the chunk's work. Only the
+   implementer thinking past the letter of the instruction caught it.
+
+2. **The cause.** `.claude/resources/prompts/gates.md` § "Prove the gate can fail on the
+   base tree" asserts a non-zero **exit status** on base and stops there. Its evidence
+   table ("Gate kind → Evidence to record") asks what to record, never whether the failure
+   was *caused by the chunk's work being absent*. `prompts/planning.md:126-133` inherits the
+   same blind spot in its fallback for gates the planner cannot run while planning: it asks
+   "if it exits 0 on base it proves nothing" and never asks the converse. A command that is
+   simply malformed fails on base, fails after, and passes both files' checks.
+
+   Secondary: `prompts/preflight.md` § 4 does say to dry-run each gate command, which would
+   have caught this — but for a bootstrap chunk there is no project to dry-run against at
+   preflight time. The one check positioned to catch it is structurally unavailable for
+   exactly the chunk that most needs it.
+
+3. **The fix.** In `gates.md` § "Prove the gate can fail on the base tree", add a third
+   watched shape beside the two already there:
+
+   > **A failure that is not about the chunk.** A non-zero exit on base proves the gate can
+   > fail; it does not prove it fails *because the work is missing*. Run the gate on base
+   > and on the finished tree and compare the **error text**, not the exit status. Identical
+   > output both times means the command is broken, not the tree — the gate is vacuous in
+   > the direction the exit code cannot show. Most common cause: a malformed invocation the
+   > tool rejects before it ever reaches the project.
+
+   Mirror one sentence of this into `planning.md`'s block at 126-133, since that is the path
+   a planner takes when it cannot run the gate itself.
+
+#### Tribal knowledge — both already promoted to `project.md`, recorded here for lineage
+
+- **Keeping the scaffolder's `AGENTS.md` is what protects `CLAUDE.md`.** The obvious read is
+  that `AGENTS.md` is redundant next to `CLAUDE.md` and should be deleted. It is not:
+  `writeAgentFiles` in `node_modules/next/dist/server/lib/generate-agent-files.js`
+  (next@16.3.5) writes its rules block into `AGENTS.md` when that file exists and into
+  `CLAUDE.md` when it does not, on every `next dev` start. Recognition signal: any impulse
+  to tidy away a framework-generated agent file in a repo whose instructions live in
+  `CLAUDE.md`.
+
+- **The `src/lib/**` Convention Map row ships with no `Doc` citation on purpose.** The SWE
+  decision tree routes it to `patterns/service-design.md`, whose mandatory section requires
+  an interface in `contracts/`, an `@Injectable()` class and a DI provider token —
+  the exact abstraction `ORCHESTRATOR.md` § Complexity rejects by name. The routing row
+  matches on the words "a module with a public API", not on the situation. Recognition
+  signal: a decision-tree row that routes on vocabulary while the destination page assumes
+  a framework this project does not use. Ruled by the lead 2026-09-20; the reviewer
+  independently verified both sources before agreeing.
+
+#### Cold-start additions for chunks 02–06
+
+- **shadcn now builds on `@base-ui/react` 1.8.0, not Radix.** Chunks 04–06 use `select`,
+  `slider` and `dialog` — read the Base UI API, not the Radix one.
+- **`pnpm test --run` does not reach Vitest.** Use `pnpm test` (the script is already
+  `vitest run`).
+- **A zero exit from `pnpm test` does not mean your spec ran.** A spec outside
+  `src/**/*.test.{ts,tsx}` is skipped silently while the run still exits 0 — verified by
+  the reviewer with a deliberately failing orphan spec. Assert the passing count.
+- **`find node_modules/...` does not follow pnpm symlinks.** Use `find -L` before concluding
+  a package ships no types.
+- **`src/lib/` modules are standalone functions over plain objects**, each with a
+  co-located `*.test.ts`. No class, registry, or one-implementation interface.
 
 ---
 

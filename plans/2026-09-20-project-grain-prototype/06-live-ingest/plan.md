@@ -32,33 +32,27 @@ rather than on a developer's machine:
 - **The cache is in-memory and best-effort.** The deployment target has no writable
   filesystem at request time, so a cache lives for the life of the serving instance and no
   longer. Nothing may depend on it surviving.
+- **No background jobs, and the copy must not imply otherwise.** Analysis happens inside the
+  request that asked for it. If the tab closes, the work is gone; a retry restarts the
+  analysis rather than resuming a partially fetched step. Page 3 and page 8 of the designs
+  carry copy written before this was settled — build their layout, and write copy that
+  matches what the prototype actually does. Do not implement resumable or detached
+  analysis.
 
-## Design Input — stop and ask before building any visual surface
+## Design Input — the designs are delivered; build against them
 
-Mid-fidelity designs for these screens are being produced separately and were not available
-when this plan was written. **Before writing the first presentation component in this
-chunk, stop and ask the user for them**, naming the screens this chunk needs:
+Mid-fidelity designs for this chunk's screens are committed at
+`plans/2026-09-20-project-grain-prototype/design/mid-fi.pdf`. Read
+`plans/2026-09-20-project-grain-prototype/design/README.md` first — it indexes the pages and
+lists the decisions the designs settled that override what this plan said when it was
+written.
 
-- The `Other…` state: URL input with the back arrow to its left
-- The ingest progress view
-- The error states (invalid URL, not found, rate limited, analysis failed)
+This chunk needs pages 1 and 2 (repository field states), 3 (ingest progress), and 8 (error states).
 
-
-Do the non-visual work first — it does not depend on the designs and is the bulk of the
-chunk:
-
-- URL parsing and validation, the bounded cache, both route handlers, and their specs
-  (T001–T007)
-
-
-Then ask, and wait. When the designs arrive, build against them: they are authoritative
-over any layout, spacing, hierarchy or wording this plan describes, and where they
-contradict it, **the designs win** — record the contradiction in the completion report so
-the plan can be corrected rather than silently diverging.
-
-If the user says to proceed without them, say so explicitly in the completion report and
-build to this plan's written description, keeping the components structured so a later
-restyle does not require re-deriving behaviour.
+**Open those pages before writing a presentation component.** Where a design contradicts
+this plan's description of layout, hierarchy, wording or interaction, **the design wins** —
+record the contradiction in the completion report so the plan gets corrected rather than
+silently diverging. Do not implement a screen you have not looked at.
 
 ## Acceptance Criteria
 
@@ -78,6 +72,9 @@ restyle does not require re-deriving behaviour.
 - Given an invalid URL, a repository that cannot be read, or an exhausted rate limit, When
   analysis is attempted, Then the failure is reported with what went wrong and the dropdown
   remains usable.
+- Given a failed analysis, When a retry is offered, Then the retry restarts the analysis and
+  no surface claims that partial progress was kept or that work continues after the tab
+  closes.
 - Given the built application, When the client bundle is inspected, Then no credential
   appears in it.
 

@@ -21,11 +21,12 @@ navigation into it.
 
 Two decisions shape the work:
 
-**Dependency edges are computed but not drawn.** The snapshot carries the dependency graph
-because transitive attribution has no meaning without it, but rendering every edge in a
-monorepo produces an unreadable hairball at exactly the moment the owner wants a quick
-answer. Edges surface instead as a per-node count — `4 direct · 2 via Package 2` — and on
-focus, where only the focused node's neighbourhood is shown.
+**Dependency edges are drawn, but only between touched packages.** An earlier draft of this
+plan said edges would be computed and never rendered, to avoid an unreadable hairball. The
+designs solve that a better way: untouched packages are dimmed and carry no edges, so only
+the active subgraph is drawn, and the dashed edge from `package-2` into `render-engine` is
+what makes the badge `4 direct · 2 via package-2` legible at a glance. Follow the designs.
+Focus mode still narrows to one package's neighbourhood.
 
 **Derivation is separate from rendering.** Which packages are active in a window, and how
 many changes reached each one and by which path, is a pure function of the snapshot and the
@@ -36,34 +37,20 @@ This chunk runs in parallel with chunk 03, so it renders the **fixture snapshot 
 by chunk 02**. It must not assume any baked snapshot exists, and it must render a snapshot
 whose `enrichment` field is absent.
 
-## Design Input — stop and ask before building any visual surface
+## Design Input — the designs are delivered; build against them
 
-Mid-fidelity designs for these screens are being produced separately and were not available
-when this plan was written. **Before writing the first presentation component in this
-chunk, stop and ask the user for them**, naming the screens this chunk needs:
+Mid-fidelity designs for this chunk's screens are committed at
+`plans/2026-09-20-project-grain-prototype/design/mid-fi.pdf`. Read
+`plans/2026-09-20-project-grain-prototype/design/README.md` first — it indexes the pages and
+lists the decisions the designs settled that override what this plan said when it was
+written.
 
-- Level 1 topology canvas, with active and inactive packages
-- The per-node direct/indirect badge
-- The time slider, including its change-volume track and presets
-- The repository dropdown
-- The whole-canvas empty state
+This chunk needs pages 4 (Level 1 topology), 7 (empty state), 10 (time slider anatomy), 11 (light theme), and 1 (the landing card's dropdown).
 
-
-Do the non-visual work first — it does not depend on the designs and is the bulk of the
-chunk:
-
-- the derivation module and its specs (T001–T003, T005)
-- the layout module and its spec (T004, T006)
-
-
-Then ask, and wait. When the designs arrive, build against them: they are authoritative
-over any layout, spacing, hierarchy or wording this plan describes, and where they
-contradict it, **the designs win** — record the contradiction in the completion report so
-the plan can be corrected rather than silently diverging.
-
-If the user says to proceed without them, say so explicitly in the completion report and
-build to this plan's written description, keeping the components structured so a later
-restyle does not require re-deriving behaviour.
+**Open those pages before writing a presentation component.** Where a design contradicts
+this plan's description of layout, hierarchy, wording or interaction, **the design wins** —
+record the contradiction in the completion report so the plan gets corrected rather than
+silently diverging. Do not implement a screen you have not looked at.
 
 ## Acceptance Criteria
 
@@ -75,6 +62,9 @@ restyle does not require re-deriving behaviour.
 - Given an active package, When its node is read, Then it shows the number of pull requests
   that reached it directly and the number that reached it indirectly, naming the package
   they came through.
+- Given a range, When the canvas renders, Then dependency edges are drawn between touched
+  packages and untouched packages carry none, with an edge reaching a package indirectly
+  visually distinct from a direct dependency edge.
 - Given a package node, When it is focused, Then its dependency neighbourhood is shown and
   the rest of the graph is not.
 - Given the slider, When it is read, Then it shows the repository's full history, the
@@ -116,8 +106,12 @@ React Flow, with custom React nodes so the badge and the package name are ordina
 components. It is a client component. Keep the React Flow instance in one place and pass it
 positioned nodes; do not spread graph state across several components.
 
-Inactive nodes must be distinguishable without relying on colour — opacity plus border
-weight, or a similar pairing.
+Render edges only between touched packages, and distinguish an indirect reach from a direct
+dependency edge — the designs use a dashed violet edge against a solid grey one.
+
+Inactive nodes must be distinguishable without relying on colour — the designs pair dimming
+with a dashed border. Direct versus indirect is carried by the badge text as well as by
+colour, so neither distinction rests on hue alone.
 
 ### 4. The time slider
 
