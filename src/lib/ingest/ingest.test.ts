@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_MAX_PULL_REQUESTS, serializeSnapshot, snapshotSchema } from '@/lib/snapshot';
 import { ingestRepository } from '@/lib/ingest/ingest';
 
-import { ingestFromFixture, replayClient, XYFLOW } from './fixtures/replay';
+import {
+  clientFor,
+  ingestFromFixture,
+  replayClient,
+  transcriptWithReversedListing,
+  XYFLOW,
+} from './fixtures/replay';
 
 /** Everything except the declared `metadata` block, which is the one exempt region. */
 function withoutMetadata(snapshot: unknown) {
@@ -40,10 +46,28 @@ describe('ingestRepository over captured xyflow/xyflow responses', () => {
     expect(JSON.stringify(withoutMetadata(snapshot))).not.toContain(analyzedAt);
   });
 
-  it('orders pull requests newest merge first, which the API listing does not', async () => {
+  it('orders pull requests newest merge first', async () => {
     const snapshot = await ingestFromFixture();
     const mergedAt = snapshot.pullRequests.map((p) => p.mergedAt);
     expect(mergedAt).toEqual([...mergedAt].sort().reverse());
+  });
+
+  it('orders by merge date even when the listing arrives in another order', async () => {
+    // The captured listing happens to arrive newest-merge-first, so the test above
+    // passes with no sort at all. This one reverses the listing pages first.
+    const reversed = await ingestRepository(clientFor(transcriptWithReversedListing()), {
+      repository: XYFLOW.ref,
+      since: XYFLOW.since,
+      until: XYFLOW.until,
+      branch: XYFLOW.branch,
+      analyzedAt: '2026-09-20T00:00:00.000Z',
+    });
+    expect(reversed.pullRequests.map((p) => p.number)).toEqual([5992, 5997, 5994, 5977, 5987, 5989]);
+
+    // …and the snapshot is identical to the one built from the unreversed listing,
+    // which is the determinism claim: listing order must not reach the output.
+    const normal = await ingestFromFixture({ analyzedAt: '2026-09-20T00:00:00.000Z' });
+    expect(serializeSnapshot(reversed)).toBe(serializeSnapshot(normal));
   });
 
   it('keeps only pull requests merged inside the requested window', async () => {
@@ -84,8 +108,9 @@ describe('ingestRepository over captured xyflow/xyflow responses', () => {
       maxPullRequests: 2,
     });
     expect(snapshot.pullRequests).toHaveLength(2);
-    // The ceiling keeps the newest merges, not an arbitrary two.
-    expect(snapshot.pullRequests[0].mergedAt > snapshot.pullRequests[1].mergedAt).toBe(true);
+    // The ceiling keeps the newest merges, not an arbitrary two — asserted by number so
+    // it fails if the cap is applied before the sort.
+    expect(snapshot.pullRequests.map((p) => p.number)).toEqual([5992, 5997]);
   });
 
   it('refuses a ceiling above the schema cap rather than silently truncating', async () => {

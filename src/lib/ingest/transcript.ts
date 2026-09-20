@@ -73,7 +73,9 @@ export function recordingFetch(upstream: typeof fetch, sink: TranscriptEntry[]):
   return (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const response = await upstream(input, init);
     const body = await response.text();
-    const headers: Record<string, string> = {};
+    // Header names come off the wire, so this record gets a null prototype for the same
+    // reason the snapshot's do. Not a snapshot key path, but the same shape.
+    const headers: Record<string, string> = Object.create(null) as Record<string, string>;
     response.headers.forEach((value, name) => {
       if (CREDENTIAL_HEADERS.includes(name.toLowerCase())) return;
       headers[name] = value;
@@ -120,6 +122,11 @@ function splitKey(key: string): [string, string] {
  */
 const PULL_REQUEST_LIST = /\/(?:repos\/[^/]+\/[^/]+|repositories\/\d+)\/pulls(?:\?|$)/;
 
+/** True for a pull-request listing response, false for its per-pull-request sub-resources. */
+export function isPullRequestListUrl(url: string): boolean {
+  return PULL_REQUEST_LIST.test(url);
+}
+
 /**
  * Shrinks a recorded transcript to a size worth committing.
  *
@@ -136,7 +143,7 @@ export function sampleTranscript(
 ): Transcript {
   return {
     entries: transcript.entries.map((entry) => {
-      if (!PULL_REQUEST_LIST.test(entry.url)) return entry;
+      if (!isPullRequestListUrl(entry.url)) return entry;
 
       const parsed = entry.json;
       if (!Array.isArray(parsed)) return entry;

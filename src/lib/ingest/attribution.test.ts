@@ -106,11 +106,19 @@ describe('attribution over captured xyflow/xyflow responses', () => {
     const pr = snapshot.pullRequests.find((p) => p.number === 5992);
     expect(pr, 'PR 5992 must be inside the captured window').toBeDefined();
 
-    // Every captured file carries the additions/deletions GitHub reported.
-    for (const f of pr!.files) {
-      expect(Number.isInteger(f.additions)).toBe(true);
-      expect(Number.isInteger(f.deletions)).toBe(true);
-    }
+    // The line counts GitHub actually reported for this pull request. Asserting the
+    // values, not their type: a transform that dropped or zeroed either column would
+    // still satisfy `typeof === "number"`.
+    const counts = Object.fromEntries(pr!.files.map((f) => [f.path, [f.additions, f.deletions]]));
+    expect(counts['.changeset/dirty-areas-leave.md']).toEqual([0, 5]);
+    expect(counts['.changeset/tough-chefs-shave.md']).toEqual([0, 8]);
+    expect(counts['packages/react/CHANGELOG.md']).toEqual([14, 0]);
+    expect(counts['packages/svelte/CHANGELOG.md']).toEqual([18, 0]);
+    expect(counts['packages/react/package.json']).toEqual([1, 1]);
+    // Both columns carry real signal across the whole capture, in both directions.
+    const all = snapshot.pullRequests.flatMap((p) => p.files);
+    expect(all.filter((f) => f.deletions > 0)).toHaveLength(35);
+    expect(all.filter((f) => f.additions > 0)).toHaveLength(45);
     // A release PR touches .changeset/ files, which belong to no package.
     expect(pr!.files.some((f) => f.package === null)).toBe(true);
     // …and package files, which do.

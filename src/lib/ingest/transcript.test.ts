@@ -150,6 +150,13 @@ describe('recordingFetch redaction', () => {
     expect(sink[0].headers.link).toBe('<https://next>; rel="next"');
     expect(sink[0].headers['content-type']).toBe('application/json');
   });
+
+  it('builds the header record on a null prototype', async () => {
+    const upstream = async () => new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    const sink: TranscriptEntry[] = [];
+    await recordingFetch(upstream as unknown as typeof fetch, sink)('https://api.github.com/x');
+    expect(Object.getPrototypeOf(sink[0].headers)).toBeNull();
+  });
 });
 
 describe('non-JSON responses', () => {

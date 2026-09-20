@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { createGitHubClient, type GitHubClient } from '../github.ts';
 import { ingestRepository } from '../ingest.ts';
-import { replayFetch, type Transcript } from '../transcript.ts';
+import { isPullRequestListUrl, replayFetch, type Transcript } from '../transcript.ts';
 import type { Snapshot } from '../../snapshot.ts';
 
 /**
@@ -33,6 +33,29 @@ export function loadTranscript(name: string = XYFLOW.transcript): Transcript {
 
 export function replayClient(name: string = XYFLOW.transcript): GitHubClient {
   return createGitHubClient({ token: 'replay-token', fetch: replayFetch(loadTranscript(name)) });
+}
+
+/**
+ * The committed transcript with every pull-request listing page's items reversed.
+ *
+ * The captured listing happens to arrive already newest-merge-first, so a test run
+ * against it cannot tell a working sort from a missing one. The pull requests here are
+ * the same real captured objects; only their order within the page is permuted, which is
+ * exactly the variable under test.
+ */
+export function transcriptWithReversedListing(): Transcript {
+  const transcript = loadTranscript();
+  return {
+    entries: transcript.entries.map((entry) =>
+      isPullRequestListUrl(entry.url) && Array.isArray(entry.json)
+        ? { ...entry, json: [...entry.json].reverse() }
+        : entry,
+    ),
+  };
+}
+
+export function clientFor(transcript: Transcript): GitHubClient {
+  return createGitHubClient({ token: 'replay-token', fetch: replayFetch(transcript) });
 }
 
 export function ingestFromFixture(overrides: { analyzedAt?: string } = {}): Promise<Snapshot> {

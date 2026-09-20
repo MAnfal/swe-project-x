@@ -166,8 +166,8 @@ whose files sit outside any package.
       name is rejected and a duplicate name is rejected; fails because no validation exists
 - [x] T004 — write failing spec for determinism — asserts two ingests over the same fixture
       serialize identically; fails because no ingest module exists
-- [ ] T005 [P] — create the snapshot schema module — Zod schema plus derived types
-- [ ] T006 [P] — create the GitHub client module — authenticated Octokit, pagination, and
+- [x] T005 [P] — create the snapshot schema module — Zod schema plus derived types
+- [x] T006 [P] — create the GitHub client module — authenticated Octokit, pagination, and
       the recursive tree request
 - [x] T007 — create the topology module — `discoverTopology`
 - [x] T008 — create the attribution module — file→package mapping, dependency closure,

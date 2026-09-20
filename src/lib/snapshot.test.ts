@@ -138,11 +138,47 @@ describe('buildRecord', () => {
 });
 
 describe('serializeSnapshot', () => {
-  it('orders object keys stably regardless of insertion order', () => {
-    const a = validSnapshot();
-    const b = validSnapshot();
-    // Rebuild the metadata object with its keys inserted in the opposite order.
-    b.metadata = Object.fromEntries(Object.entries(b.metadata).reverse()) as typeof b.metadata;
-    expect(serializeSnapshot(snapshotSchema.parse(a))).toBe(serializeSnapshot(snapshotSchema.parse(b)));
+  const SHA_A = 'aaa1111111111111111111111111111111111111';
+  const SHA_Z = 'zzz9999999999999999999999999999999999999';
+  const entry = { label: 'l', approach: 'a', steps: [{ commitSha: 'c', summary: 's' }] };
+
+  const withEnrichment = (keys: [string, string]) =>
+    snapshotSchema.parse({
+      ...validSnapshot(),
+      enrichment: { [keys[0]]: entry, [keys[1]]: entry },
+    });
+
+  it('orders record keys stably regardless of insertion order', () => {
+    const zFirst = withEnrichment([SHA_Z, SHA_A]);
+    const aFirst = withEnrichment([SHA_A, SHA_Z]);
+
+    // The premise: zod 4.6.5 normalises `z.object` fields to schema order but leaves
+    // `z.record` keys in insertion order, so these two really do differ going in. If a
+    // zod upgrade starts normalising records, this is the assertion that says so.
+    expect(Object.keys(zFirst.enrichment ?? {})).toEqual([SHA_Z, SHA_A]);
+    expect(Object.keys(aFirst.enrichment ?? {})).toEqual([SHA_A, SHA_Z]);
+
+    // …so the equality below is the serializer's doing, not zod's. `enrichment` is keyed
+    // by merge SHA and written by a later chunk; without this, two runs that enrich in a
+    // different order serialize differently and determinism is lost.
+    expect(serializeSnapshot(zFirst)).toBe(serializeSnapshot(aFirst));
+
+    const serialized = serializeSnapshot(zFirst);
+    expect(serialized.indexOf(SHA_A)).toBeLessThan(serialized.indexOf(SHA_Z));
+  });
+
+  it('sorts keys at every depth, not just the top level', () => {
+    // A changed file is parsed into schema order (path, additions, deletions, status,
+    // package); sorted order is different, so this fails if the sort is shallow or absent.
+    const serialized = serializeSnapshot(snapshotSchema.parse(validSnapshot()));
+    const file = serialized.slice(serialized.indexOf('"files"'));
+    const keys = [...file.matchAll(/"(path|additions|deletions|status|package)":/g)].map((m) => m[1]);
+    expect(keys.slice(0, 5)).toEqual(['additions', 'deletions', 'package', 'path', 'status']);
+  });
+
+  it('puts the top-level keys in sorted order', () => {
+    const serialized = serializeSnapshot(withEnrichment([SHA_Z, SHA_A]));
+    const top = [...serialized.matchAll(/^ {2}"(\w+)":/gm)].map((m) => m[1]);
+    expect(top).toEqual(['enrichment', 'metadata', 'packages', 'pullRequests']);
   });
 });

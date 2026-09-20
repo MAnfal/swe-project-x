@@ -7,7 +7,7 @@
  *
  * Run it with Node directly — Node 24 executes TypeScript without a transpiler:
  *
- *   node scripts/ingest.ts --repo xyflow/xyflow \
+ *   node scripts/ingest.mts --repo xyflow/xyflow \
  *     --since 2026-08-31T00:00:00Z --until 2026-09-02T00:00:00Z --out snapshot.json
  *
  * `--record <file>` additionally writes the HTTP transcript of the run, which is how the
@@ -29,13 +29,14 @@ import {
 } from '../src/lib/ingest/transcript.ts';
 import { DEFAULT_MAX_PULL_REQUESTS, serializeSnapshot } from '../src/lib/snapshot.ts';
 
-const USAGE = `Usage: node scripts/ingest.ts --repo <owner/repo> --since <iso> --until <iso> --out <file>
+const USAGE = `Usage: node scripts/ingest.mts --repo <owner/repo> --since <iso> --until <iso> --out <file>
                               [--branch <name>] [--max-pull-requests <n>]
                               [--record <transcript.json>] [--record-sample <n>]
                               [--replay <transcript.json>]`;
 
 function parseArgs(argv: string[]): Record<string, string> {
-  const args: Record<string, string> = {};
+  // Flag names come from argv, so the record gets a null prototype.
+  const args: Record<string, string> = Object.create(null) as Record<string, string>;
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
     if (!token.startsWith('--')) throw new Error(`unexpected argument "${token}"\n${USAGE}`);
