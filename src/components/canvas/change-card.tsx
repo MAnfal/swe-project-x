@@ -78,7 +78,6 @@ export function ChangeCard({ change, packageName, onOpen }: ChangeCardProps) {
       type="button"
       data-slot="change-card"
       data-fallback={change.fallback}
-      aria-expanded={false}
       aria-label={`${change.label} — pull request ${change.number}, ${
         change.inclusion.kind === 'indirect'
           ? `reached ${packageName} via ${change.inclusion.through}`
