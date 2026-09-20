@@ -91,6 +91,19 @@
     padding: 1px 5px; white-space: nowrap;
   }
 
+  /* ---- inline figure ---- */
+  figure.shot { margin: 0; }
+  figure.shot a {
+    display: block; border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; background: #101010; box-shadow: var(--shadow);
+    transition: border-color .15s ease;
+  }
+  figure.shot a:hover { border-color: var(--muted); }
+  figure.shot img { display: block; width: 100%; height: auto; }
+  figcaption { font-size: .875rem; color: var(--muted); margin-top: 9px; padding: 0 2px; }
+  .cap-title { font-weight: 600; font-size: .9375rem; color: var(--fg); display: flex; align-items: baseline; gap: 8px; }
+  .cap-desc { display: block; margin-top: 3px; }
+
   /* ---- execution timeline ---- */
   .steps { list-style: none; margin: 0; padding: 0; }
   .step { position: relative; padding: 0 0 4px 44px; }
@@ -135,8 +148,8 @@
   </div>
 
   <section>
-    <h2>Relevant resources</h2>
-    <p class="section-note">The walkthrough and the written rationale, the thinking that preceded the build, and the design it was built against.</p>
+    <h2>Rationale</h2>
+    <p class="section-note">What Grain is, why it takes this shape, and the tradeoffs behind it.</p>
     <div class="cards">
 
       <a class="card" href="https://www.loom.com/share/13273d9f4c384711bb2fd908b4c74a73" target="_blank" rel="noopener">
@@ -145,23 +158,43 @@
       </a>
 
       <a class="card" href="https://docs.google.com/document/d/1B6-XtsuPth4XSiOevKFVXq4RyE39KCGvYjSAGURytJ4/edit?usp=sharing" target="_blank" rel="noopener">
-        <span class="card-title">Design rationale <span class="tag">Doc</span></span>
+        <span class="card-title">Written rationale <span class="tag">Doc</span></span>
         <span class="card-desc">Why this theme, what makes the idea non-obvious, the tradeoffs I made, and where I&rsquo;d take it next.</span>
       </a>
 
-      <a class="card" href="https://anfalmushtaq.com/articles/primitives-of-spec-driven-development" target="_blank" rel="noopener">
-        <span class="card-title">Primitives of spec-driven development <span class="tag">Article</span></span>
-        <span class="card-desc">My own writing on the method this project was built with — the loop the eight sessions below run on.</span>
-      </a>
+    </div>
+  </section>
 
-      <a class="card" href="https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1" target="_blank" rel="noopener">
-        <span class="card-title">Mid-fi design <span class="tag">Artifact</span></span>
-        <span class="card-desc">The interactive mid-fidelity design the canvas was built against, before any code existed.</span>
-      </a>
+  <section>
+    <h2>Design</h2>
+    <p class="section-note">
+      In the order it happened — a vague pain point scoped into a spec, the three levels sketched,
+      then a clickable design to build the canvas against. All of it before any code existed.
+    </p>
+    <div class="cards">
 
       <a class="card" href="/submission/prototype-brainstorm.pdf" target="_blank" rel="noopener">
         <span class="card-title">Prototype brainstorm <span class="tag">PDF</span></span>
         <span class="card-desc">The session that turned a vague pain point into a scoped spec — problem framing, what got cut, and why.</span>
+      </a>
+
+      <figure class="shot">
+        <a href="/submission/lofi-three-levels.png" target="_blank" rel="noopener">
+          <img src="/submission/lofi-three-levels.png" alt="Hand-drawn sketch of the three levels: packages and their dependency arrows at level one, the changes that reached a package at level two, and the ordered steps behind one change at level three." loading="lazy" width="3635" height="1488">
+        </a>
+        <figcaption>
+          <span class="cap-title">Lo-fi sketch <span class="tag">Drawing</span></span>
+          <span class="cap-desc">
+            The first drawing of the whole idea: packages and their dependencies, the changes that
+            reached one package, and the ordered steps that produced one change. The three levels
+            the shipped prototype still has.
+          </span>
+        </figcaption>
+      </figure>
+
+      <a class="card" href="https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1" target="_blank" rel="noopener">
+        <span class="card-title">Mid-fi design <span class="tag">Artifact</span></span>
+        <span class="card-desc">The sketch made interactive — the mid-fidelity design the canvas was built against.</span>
       </a>
 
     </div>
@@ -173,6 +206,8 @@
       Eight Claude Code sessions, all on 20 September 2026, from 08:01 to 19:44. Every one is
       a complete transcript — the prompts, the model&rsquo;s reasoning, the tool calls, and the
       reviews that sent work back.
+      They run on the loop I describe in
+      <a href="https://anfalmushtaq.com/articles/primitives-of-spec-driven-development" target="_blank" rel="noopener">Primitives of spec-driven development</a>.
     </p>
 
     <ol class="steps">
