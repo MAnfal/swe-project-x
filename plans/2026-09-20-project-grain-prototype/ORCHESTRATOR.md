@@ -42,7 +42,7 @@ See `SPEC.md` in this directory.
 | 03 | US1 | Merged | [#3](https://github.com/MAnfal/swe-project-x/pull/3) | — |
 | 04 | US1 | Merged | [#4](https://github.com/MAnfal/swe-project-x/pull/4) | — |
 | 05 | US1 | Merged | [#6](https://github.com/MAnfal/swe-project-x/pull/6) | — |
-| 06 | US2 | PR open | [#7](https://github.com/MAnfal/swe-project-x/pull/7) | — |
+| 06 | US2 | Merged | [#7](https://github.com/MAnfal/swe-project-x/pull/7) | — |
 
 Every chunk names the story it serves. A chunk that serves no story is either scaffolding
 that belongs inside another chunk, or scope that crept in.
@@ -127,6 +127,7 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `review_passed` | 06 | Iteration 2 **PASS**, third reviewer (never reused). Could not find the implementer's capture script or its `.body` files on disk, so rather than trusting the report's printed self-check it **reproduced the live evidence from scratch** — an analysis at a different ceiling (2, not 4) to prove the figures are not hardcoded, then a cold→cached enrichment pair with `diff` exiting 1 — corroborating the central claims from a different process, port and toolchain. Audited the routes, boundary validation and cache against the cited bibles directly, and mutated three things neither prior pass touched: `classifyFailure`'s 404 branch (killed, 9 failures) and the LRU eviction loop (killed, 3 failures) died; `askedRef` in `grain-workspace.tsx:207` **survived**. No rubric violation — `project.md` excludes `pnpm test` from the component gate and no chunk in this plan has component specs. Lead narrowed the reviewer's framing before accepting it: line 208's `hasOwnProperty` check independently blocks a re-expand after success and the server cache blocks the model call regardless, so `askedRef` uniquely covers the in-flight double-expand and the instance-recycled-mid-session case. Non-blocking, filed as a follow-up |
 | 2026-09-20 | `gates_passed` | 06 | Lead re-ran all four on the **merged** tree at `f71e78b` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Test Files 19 passed (19)` / `Tests 379 passed (379)`, `pnpm build` 0 with `/` still `○ (Static)` and both routes `ƒ (Dynamic)`, `pnpm typecheck` 0, tree clean. Production code byte-identical from iteration 1's reviewed tree through delivery — `git diff --stat 79b09d9..HEAD` was the completion report and nothing else across both review rounds. Chunk 06's 10 `project.md` deltas applied by the lead, each re-measured rather than trusted, including the one that **contradicts the wave-5 preflight**: `.next/static` held 24 `.js` files at preflight and 10 on the delivered build, so the convention now records that a client-bundle gate asserts a non-empty corpus and never a count — which is what the preflight's own `-gt 0` hardening already did |
 | 2026-09-20 | `pr_created` | 06 | [#7](https://github.com/MAnfal/swe-project-x/pull/7) → `feat/plan--project-grain-prototype`, at `f71e78b`. Carries the plan-branch merge, so its diff is what actually lands. Lead drove the full US2 flow in a browser against the real GitHub and Anthropic APIs before opening it — `Other…` swap, back arrow restoring the *previous* selection, invalid-URL error preserving typed text, a live analysis with named progress steps, the truncation banner, on-demand enrichment at Level 3, propagation back to the Level 2 card, and zero network requests on re-expansion |
+| 2026-09-20 | `pr_merged` | 06 | [#7](https://github.com/MAnfal/swe-project-x/pull/7) merged at 19:07:58Z into `feat/plan--project-grain-prototype`. Worktree `.worktrees/06-live-ingest` removed — until it is, `pnpm lint` in the main checkout walks it and is unreadable. Every chunk is now `Merged`; the State table had gone stale at `PR open` and was corrected at delivery |
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
 `wave_merged`, `plan_delivered`.
@@ -173,7 +174,7 @@ software rather than a half-built layer.
 | ----- | ---------- | ---------------------------------------- | -------- |
 | Foundation | 01 | `pnpm dev` serves a Next.js page; type check, lint, tests and build all run and are recorded in `project.md` | ☑ 2026-09-20 |
 | US1 (P1) | 05 | Open the deployed page, pick a pre-analyzed repository, scrub to any window, see which packages changed, expand one to its changes with labels and approach notes, expand a change to its ordered steps. No token, no network, no model call. | ☑ 2026-09-20 |
-| US2 (P2) | 06 | Choose `Other…`, paste a GitHub monorepo URL, watch specific progress, and land on the same three levels with labels generated on demand. | ☐ |
+| US2 (P2) | 06 | Choose `Other…`, paste a GitHub monorepo URL, watch specific progress, and land on the same three levels with labels generated on demand. | ☑ 2026-09-20 |
 
 ## Design Decisions
 

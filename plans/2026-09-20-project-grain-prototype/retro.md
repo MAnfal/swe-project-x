@@ -944,6 +944,100 @@ correction. The finding itself is real and correctly left alone: the lead verifi
 
 ---
 
+### Delivery boundary — Part 1
+
+#### The State table lied, and only GitHub knew
+
+`/plan:complete` opened on a table reading chunk 06 `PR open`, which by its own branch rule
+means *stop, delivery does not start on a half-executed plan*. PR #7 had in fact merged at
+19:07:58Z. The plan branch was 10 commits behind its own remote, so nothing local
+contradicted the table either. What caught it was checking the PR's real state
+(`gh pr view 7 --json state,mergedAt`) rather than trusting the file — the same
+measure-before-you-write rule the chunk-06 journal ends on, applied to bookkeeping instead
+of to a report.
+
+**Proposed** (Part 2): the first step of `prompts/completion.md` should be to reconcile the
+State table against `gh pr list`, not to read the table. A state machine whose state is
+hand-written drifts exactly once per hand-written transition, and the `pr_merged` event is
+the one transition nobody is dispatched to perform — every other row is written by an agent
+who was just told to do the thing.
+
+#### A merged chunk's worktree was still on disk at delivery
+
+`.worktrees/06-live-ingest` survived its PR merge, and `project.md` already records what
+that does: `pnpm lint` takes no path argument, walks the worktree and its `node_modules`,
+and reports thousands of problems that belong to nobody. Removed before the gates ran. The
+convention says a worktree is removed "as soon as its PR lands" — it is written as advice,
+and the thing that actually removes it is a human remembering. Same shape as the finding
+above.
+
+#### Gates on the merged tree
+
+`main` held no commits the plan branch lacked, so the source-branch merge was a no-op and
+the assembled tree is the plan branch as-is. All four green after the worktree removal,
+type check last: `pnpm lint` exit 0 silent, `pnpm test` `Test Files 19 passed (19)` /
+`Tests 379 passed (379)`, `pnpm build` exit 0 with `/` still `○ (Static)` and both routes
+`ƒ (Dynamic)`, `pnpm typecheck` exit 0. Tree clean afterwards, so `prebuild` regenerating
+`catalog.generated.ts` produced no diff.
+
+#### The US2 checkpoint, driven at delivery rather than claimed
+
+The story-checkpoint box for US2 was still unticked; chunk 06's own PR was opened on a lead
+browser run, but the checkpoint belongs to the assembled tree. Driven against
+`PORT=3100 pnpm start` on the merged build, using two repositories that are **not**
+pre-analyzed so nothing could be served from a committed snapshot:
+
+- `radix-ui/primitives` — live, `53 of 53 pull requests` in the 90-day window, inside the
+  100 ceiling. `trpc/trpc` — live, `36 of 36`. Both logged by the route itself.
+- Progress is **per pull request**, not per batch: the NDJSON stream carried 57 `progress`
+  events and one `complete` for the 53-PR run, against a success metric asking for one per
+  ten. Named steps with their own detail (`main`, `40 packages · 106 dependency edges`),
+  a percentage and `Step 3 of 5` — captured on screen mid-run, not inferred from the stream.
+- On-demand enrichment: `[Enrichment] radix-ui/primitives#710e50b… generated` appears
+  **once** in the server log across two expansions of the same change, which is the
+  "at most once per pull request per session" metric measured rather than asserted.
+- The no-network metric was measured from the browser, not argued: a full Level 1 → 2 → 3
+  walk of the pre-analyzed `shadcn-ui/ui` produced 12 requests, all `localhost:3100` plus
+  the Chrome extension's own injected script. Fonts are self-hosted under
+  `/_next/static/media/`, so there is no Google Fonts request to forget about. No
+  `[Analysis]` or `[Enrichment]` line appeared in the server log during that walk.
+
+#### Two things worth seeing that no chunk review could have
+
+Both are properties of the *assembly*, which is what the whole-diff pass exists for:
+
+- **The empty state and the "jump to that window" affordance carry the live path too.**
+  Selecting 30d on `radix-ui/primitives` landed on a genuinely empty window, and the panel
+  named the nearest activity (`Jul 16 – Aug 15 · 27 changes`) with a button to it. That is
+  a US1 acceptance criterion satisfied by a US2 repository — the single-snapshot-schema
+  principle paying out, visible only because the two stories were exercised on one tree.
+- **Legibility degrades with package count, and the design's answer is dimming, not
+  hiding.** `shadcn-ui/ui` at 5 packages is clear. `radix-ui/primitives` at 68 packages and
+  513 dependency edges, with 66 touched in a 90-day window, is a hairball at Level 1 — the
+  SPEC's revised clarification chose dimming over edge-hiding precisely to avoid this, and
+  at this scale dimming has almost nothing left to dim. Not a defect against any acceptance
+  criterion, and not fixed here: filed rather than absorbed.
+
+#### Whole-diff review of the assembled branch
+
+Chunks 01–04 already shipped to `main` as PR #5, so the final PR carries chunks 05 and 06:
+49 files, 7734 insertions. Checked for the cross-chunk contradictions per-chunk review
+structurally cannot see, and found none:
+
+- Every number `README.md` states was re-derived from the code it documents, not from the
+  plan: `claude-haiku-4-5` (`enrichment.ts:60`), window `90`/`365`
+  (`request.ts:103,110`), pull requests `100`/`500` (`snapshot.ts:25,30`), `runtime`
+  `'nodejs'` and `maxDuration` `300`/`60` on the two routes. All agree.
+- The never-`@/` rule holds where it binds: every `@/` specifier in the tree is in a route
+  handler or a `*.test.ts`, and no non-test `src/lib/**` module uses one.
+- Principles 1, 2 and 3 re-checked against the assembled tree by grep: no credential read
+  outside `src/app/api/**` and `scripts/`, no `NEXT_PUBLIC_*`, no `ai`/`@ai-sdk` import
+  under `src/components/`, no `child_process` or filesystem write under `src/`. The single
+  `ANTHROPIC_API_KEY` hit outside the allowed paths is the comment in `enrichment.ts:40`
+  documenting the rule.
+
+---
+
 ## Cold-start brief
 
 Appended to after each chunk. What a fresh session — or the next chunk's implementer —
