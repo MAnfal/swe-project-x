@@ -40,7 +40,7 @@ See `SPEC.md` in this directory.
 | 01 | Foundation | Merged | [#1](https://github.com/MAnfal/swe-project-x/pull/1) | — |
 | 02 | US1 | Merged | [#2](https://github.com/MAnfal/swe-project-x/pull/2) | — |
 | 03 | US1 | Merged | [#3](https://github.com/MAnfal/swe-project-x/pull/3) | — |
-| 04 | US1 | In review | — | — |
+| 04 | US1 | PR open | [#4](https://github.com/MAnfal/swe-project-x/pull/4) | — |
 | 05 | US1 | Not started | — | — |
 | 06 | US2 | Not started | — | — |
 
@@ -96,6 +96,11 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `review_iteration` | 04 | Iteration 2 **FAIL**, fresh reviewer. Confirmed iteration 1's two mutants are genuinely dead, then widened as instructed and found three new survivors in the same functions — `historyBounds`' two boundary-tie comparisons and `volumeSeries`' span guard, each 144/144 green. Lead reproduced all three and split them by reachability: `github.ts:139` filters to `[since, until)` so the ties are defensive-only, but `snapshotSchema` accepts a zero-width **and inverted** window, so the span guard is reachable and yields a silent `NaN`. Iteration 3 scoped to those three plus a reachability disclosure, with a stated stopping rule: further survivors confined to unreachable defensive code are warnings, not blockers |
 
 | 2026-09-20 | `pr_merged` | 03 | #3 merged at `45866bf`, brought onto the plan branch by merge (never rebase) at `ccaadcf`. Lead re-verified the merged tree: lint 0 (scoped `pnpm exec eslint src scripts`, because chunk 04's worktree is still live), `pnpm test` `Test Files 9 passed (9) / Tests 140 passed (140)`, `pnpm build` 0, `pnpm typecheck` 0. Worktree `.worktrees/03-ai-enrichment` removed. Chunk 03's 8 `project.md` deltas applied by the lead, with the new CLI flags verified against `scripts/ingest.mts --help` rather than trusted |
+
+| 2026-09-20 | `review_iteration` | 04 | Iteration 3 **PASS**, fresh reviewer (third, never reused). Re-applied all three iteration-2 mutants itself and watched each named test fail. Hunted beyond them and found three more survivors, then argued each across the lead's stopping rule rather than hiding behind it — and **measured** that `layout.ts`'s self-edge guard changes nothing about the output rather than asserting unreachability. Also re-derived the "lower clamp is unreachable" argument independently instead of accepting the report's word. No blocking issues |
+| 2026-09-20 | `chunk_blocked` | 04 | Briefly — merging the plan branch into chunk 04 turned 3 tests red. One was its own generated index (working as designed). The other two were chunk 03's `baked-snapshots.test.ts`, which quantifies over `src/lib/snapshots/` and asserts every file carries enrichment, against chunk 04's deliberately un-enriched snapshot. **Lead planning defect**: one directory holding two kinds of file invites a test that quantifies over the directory. Resolved on chunk 04's branch by changing the discriminator — absent `enrichment` means un-enriched fixture; present means it must be complete, so **partial** enrichment now fails on any snapshot. Stronger than what it replaced |
+| 2026-09-20 | `gates_passed` | 04 | Lead re-ran all four at `257b7d3` **on the merged tree**, type check last: `pnpm lint` 0, `pnpm test` `Test Files 12 passed (12) / Tests 202 passed (202)`, `pnpm build` 0, `pnpm typecheck` 0. Re-ran the two decisive canaries independently — deleting a curated snapshot's enrichment fires only the curated assertion, proving the two checks are not redundant. Also drove the built app and looked at the four-snapshot picker and Level 1 directly |
+| 2026-09-20 | `pr_created` | 04 | [#4](https://github.com/MAnfal/swe-project-x/pull/4) → `feat/plan--project-grain-prototype`, at `257b7d3`. Carries the plan-branch merge, so its diff is what actually lands |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
