@@ -37,7 +37,7 @@ See `SPEC.md` in this directory.
 
 | Chunk | Story | Status | PR | Blocker |
 | ----- | ----- | ------ | -- | ------- |
-| 01 | Foundation | In progress | — | — |
+| 01 | Foundation | PR open | (pending) | — |
 | 02 | US1 | Not started | — | — |
 | 03 | US1 | Not started | — | — |
 | 04 | US1 | Not started | — | — |
@@ -64,6 +64,8 @@ When every chunk is `Merged`, run `/plan:complete`.
 | ---- | ----- | ----- | ------ |
 | 2026-09-20 | `wave_started` | — | Wave 1 — preflight clean: plan branch level with `origin/main`, all chunk-01 reference paths resolve, pnpm 9.15.4 / node v24.13.0 present |
 | 2026-09-20 | `chunk_dispatched` | 01 | Worktree `.worktrees/01-boilerplate` on `feat/project-grain-prototype--boilerplate`; bootstrap is a no-op (no project exists yet) |
+| 2026-09-20 | `gates_passed` | 01 | Lead re-ran all four at `c391559` after the last edit, type check last: `pnpm lint` 0, `pnpm test` `Tests 3 passed (3)`, `pnpm build` compiled, `pnpm typecheck` 0 |
+| 2026-09-20 | `review_passed` | 01 | Iteration 1. Reviewer re-derived gate falsifiability with its own canaries and independently verified the `src/lib/**` arbitration against both sources. Two non-blocking warnings: `project.md` frontmatter still carries `id:`; `shadcn` sits in `dependencies` |
 
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
