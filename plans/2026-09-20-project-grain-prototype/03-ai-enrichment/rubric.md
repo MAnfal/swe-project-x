@@ -68,6 +68,21 @@ often as it passes a violation.
       a key, and no key appears in a snapshot
 - [ ] The model input is bounded to metadata rather than full patches, or the report
       explains why that was insufficient
+- [ ] The default model id is `claude-haiku-4-5`, read from an environment variable rather
+      than hardcoded at the call site, so escalating the model needs no code change
+- [ ] `output_config.effort` is **not** set — effort errors on Haiku 4.5, which is not an
+      Opus-family model. Grade the request options actually passed to `generateObject`
+- [ ] The payload is bounded before the call, not after: Haiku 4.5's context is 200K while
+      the merged schema permits 1000 commits and 3000 files per pull request, so a
+      pathological record must be capped rather than sent whole. The report says what was
+      capped and how
+- [ ] The completion report carries measured input/output token totals per repository, not
+      just a pull-request count. Those numbers are the evidence any later decision to
+      escalate the model would rest on, and they cannot be recovered after the bake
+- [ ] The `approach` notes are graded by **reading several baked records**. If they read as
+      restatements of what changed rather than how it was done, that is the documented
+      trigger to escalate the model (ORCHESTRATOR.md § Design Decisions 10) — report it as a
+      finding with quoted examples rather than passing it silently
 - [ ] `project.md` was not edited by this chunk; deltas are reported for the wave boundary
 - [ ] The judgment calls the plan enumerated are each explained in the completion report
 

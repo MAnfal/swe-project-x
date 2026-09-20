@@ -176,6 +176,33 @@ for judgment calls. Amend in place with a dated note if one changes mid-executio
    bounded request. Build those screens' layout with copy that matches what actually
    happens: a retry restarts.
 
+10. **Enrichment runs on `claude-haiku-4-5`, not an Opus-tier model.** Added 2026-09-20,
+    before chunk 03 dispatched. The plan had defaulted to `claude-opus-5` in three places
+    with **no recorded reason** — the owner challenged it and no justification existed.
+
+    The reasoning that replaced the default: the enrichment payload is **metadata only** —
+    commit messages, file paths, PR title and body, no diffs — because decision 4 keeps one
+    call per pull request affordable. With that input the ceiling on `approach` quality is
+    set by how much signal the commit messages carry, not by the model reading them. A
+    larger model cannot infer the road not taken from evidence that is not in the payload.
+    Two of the three output fields (`label`, `steps`) are extraction and summarization
+    besides. Haiku 4.5 is also $1/$5 per MTok against $5/$25, and faster per call across a
+    three-repository bake.
+
+    **This is a reversible decision made on a prior, and it is set up to be corrected by
+    evidence.** The model id is read from an environment variable, so escalating costs an
+    env change and a re-bake, not a code change. The trigger is already a rubric item that
+    predates this decision: *"The approach note describes how the change was made, not a
+    restatement of what changed — graded by reading several baked records, not by field
+    presence alone."* If chunk 03's reviewer finds the notes read as restatements, that is
+    the signal to escalate, and the chunk reports it with quoted examples rather than
+    passing silently. Chunk 03 also reports measured token totals per repository, because
+    those are what an escalation argument would need and they are unrecoverable afterwards.
+
+    Note for implementers: Haiku 4.5 is not an Opus-family model. `output_config.effort`
+    errors on it, and its context window is 200K rather than 1M.
+
+
 ### Complexity
 
 | Abstraction | What it buys | Flat alternative, and why it loses |

@@ -420,6 +420,45 @@ parallel-wave boundary section, chunk 04 gained 6 plus a deployment section.
 about to dispatch, not just the plan — at minimum, that the rubric cites the Convention Map at
 all when the map is non-empty. Recorded for Part 2.
 
+#### User correction — an unjustified model default survived planning and two reviews
+
+The owner asked what our rationale was for `claude-opus-5`, and there wasn't one. The model
+id appeared three times in chunk 03's plan — § What To Do, task T004, § External
+Dependencies — and was justified in none of them. Nothing in SPEC.md or the Design Decisions
+covered it. It was a default that got written down and then read back as though it were a
+decision.
+
+Worth noting where it *didn't* get caught. Chunk 03's plan was written, reviewed at planning
+time, and had its rubric regenerated at this wave's preflight — three passes over the same
+file — and none of them asked "why this model?". A named constant that looks like a
+considered choice reads as one. `plan-check` has no notion of an unjustified default, and
+neither does the rubric generator.
+
+My first answer to the challenge was worse than the question deserved: I defended the
+default by splitting the fields (`label`/`steps` are extraction, `approach` needs judgment)
+and recommended keeping Opus while testing alternatives. That framing skipped the fact I had
+just conceded — there was no rationale — and it also missed the substantive point, which the
+owner then made: **the payload is metadata only**. Decision 4 caps the input at commit
+messages, file paths and the PR body precisely to keep one call per pull request affordable.
+With that input the ceiling on `approach` quality is set by the signal in the commit
+messages, not by the model reading them. The argument for Opus was thinner than I made it
+sound, and I was defending a position rather than evaluating one.
+
+Settled as Design Decision 10: Haiku 4.5, with the escalation trigger bound to a rubric item
+that already existed, and per-repository token totals reported so a later escalation argument
+has evidence to stand on.
+
+**The generalization worth keeping**: a plan that names a model, a timeout, a page size, a
+retry count or a concurrency bound should carry the reason next to the number, or carry a
+pointer to the Design Decision that holds it. The cost of the missing sentence is not the
+wrong value — it is that nobody can tell a considered value from a default, so nobody
+re-examines it. Chunk 03's plan named `claude-opus-5` beside a correct pricing note, which
+made it look *more* considered, not less.
+
+**Proposed framework fix**: the planning phase should require a one-line rationale beside any
+externally-priced or externally-bounded constant, and `plan-check` should flag a model id
+that appears in a chunk plan with no Design Decision referencing it. Recorded for Part 2.
+
 #### Tribal knowledge — the parallel wave shares a directory, and that was a deliberate choice
 
 1. **The decision.** Chunks 03 and 04 both write committed snapshots. I put them in one

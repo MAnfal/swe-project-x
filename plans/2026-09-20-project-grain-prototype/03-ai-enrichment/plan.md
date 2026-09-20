@@ -102,8 +102,21 @@ Constrain the output so it stays renderable: `label` is a short phrase, `approac
 sentence, `steps` is a bounded ordered list of short phrases. Enforce the bounds in the
 schema, not in a prompt sentence that asks nicely.
 
-**Model**: `claude-opus-5` through `@ai-sdk/anthropic`. Read the model id from an
+**Model**: `claude-haiku-4-5` through `@ai-sdk/anthropic`. Read the model id from an
 environment variable with that as the default, so it can be changed without a code change.
+
+**Changed 2026-09-20, before dispatch** — this plan previously defaulted to `claude-opus-5`
+with no recorded reason. See ORCHESTRATOR.md § Design Decisions 10 for the rationale and the
+escalation trigger. Two Haiku 4.5 specifics that will cost you a cycle if you miss them:
+
+- **Do not set `output_config.effort`.** Effort errors on Haiku 4.5; it is not an Opus-family
+  model. If you want to constrain thinking at all, Haiku 4.5 takes the older
+  `thinking: { type: "enabled", budget_tokens: N }` form — but for a bounded structured
+  extraction like this one you almost certainly want neither.
+- **Context is 200K, not 1M.** Ample for metadata, but `MAX_COMMITS_PER_PULL_REQUEST` is
+  1000 and `MAX_FILES_PER_PULL_REQUEST` is 3000 in the merged schema, so a pathological pull
+  request can still overrun it. Bound the payload before the call rather than discovering
+  the ceiling at bake time, and say in the completion report what you capped and how.
 
 Do not send whole diffs. Commit messages, file paths and the PR body are enough for the
 label and the steps, and they are what keeps one call per pull request affordable. If the
@@ -166,7 +179,7 @@ key is written into a snapshot, and no snapshot carries a token in a URL.
 - [ ] T003 — write failing spec for cache reuse — asserts an already-enriched pull request
       produces no model call; fails because no enrichment module exists
 - [ ] T004 [P] — create the enrichment module — Zod output schema, `generateObject` call,
-      model id from environment with `claude-opus-5` as default
+      model id from environment with `claude-haiku-4-5` as default
 - [ ] T005 — create the fallback and failure-reporting path
 - [ ] T006 — edit the ingest CLI from chunk 02 — add the enrichment step and the bake output
 - [ ] T007 — run the bake for the three curated repositories and commit the snapshots
@@ -220,10 +233,13 @@ code only for the model call itself.
 ## External Dependencies
 
 - `ai` — `generateObject` with a Zod schema for typed, validated model output.
-- `@ai-sdk/anthropic` — the provider. Model `claude-opus-5`, overridable by environment.
-- Anthropic API — one call per pull request at bake time. `claude-opus-5` is $5/MTok input
-  and $25/MTok output; keep the per-call payload to commit messages, file paths and the PR
-  body rather than full patches, and report the total pull-request count baked.
+- `@ai-sdk/anthropic` — the provider. Model `claude-haiku-4-5`, overridable by environment.
+- Anthropic API — one call per pull request at bake time. `claude-haiku-4-5` is $1/MTok
+  input and $5/MTok output; keep the per-call payload to commit messages, file paths and the
+  PR body rather than full patches, and report the total pull-request count baked **and the
+  measured input/output token totals per repository**. Those numbers are what a later
+  decision to escalate the model would be argued from, and nobody can recover them after the
+  bake.
 
 ## Verification Gates
 
