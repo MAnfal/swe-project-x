@@ -267,6 +267,63 @@ describe('historyBounds — a merge outside the declared window (T003)', () => {
   });
 });
 
+describe('historyBounds — a merge sitting exactly on a declared bound (T003)', () => {
+  // The widening loop compares strictly: it widens only for a merge *outside* the declared
+  // window. A merge exactly on a bound leaves the declared bound reported verbatim, which
+  // is what `volumeSeries` anchors its first and last bucket edges to. Both cases below
+  // are decided at equality, so `<` vs `<=` and `>` vs `>=` produce different output.
+
+  it('keeps the declared lower bound when the oldest merge sits exactly on it', () => {
+    // PR 5989 merged at 2026-08-31T09:22:57Z — the same instant, spelled with milliseconds.
+    const declared = { since: '2026-08-31T09:22:57.000Z', until: '2026-09-02T00:00:00Z' };
+    const snapshot = snapshotWithDeclaredWindow(declared);
+
+    expect(historyBounds(snapshot)).toEqual({ from: declared.since, to: declared.until });
+    // And the merge on the bound is still reachable, which is why not widening is safe.
+    expect(deriveWindow(snapshot, historyBounds(snapshot)).changeCount).toBe(6);
+  });
+
+  it('keeps the declared upper bound when the newest merge sits exactly on it', () => {
+    // PR 5992 merged at 2026-09-01T12:02:55Z — again the same instant, spelled differently.
+    const declared = { since: '2026-08-31T00:00:00Z', until: '2026-09-01T12:02:55.000Z' };
+    const snapshot = snapshotWithDeclaredWindow(declared);
+
+    expect(historyBounds(snapshot)).toEqual({ from: declared.since, to: declared.until });
+    expect(deriveWindow(snapshot, historyBounds(snapshot)).changeCount).toBe(6);
+  });
+});
+
+describe('volumeSeries — a history with no width (T003)', () => {
+  // `snapshotSchema` accepts a window whose `since` equals its `until` — measured, it
+  // parses clean — so a history can collapse to a single instant. Dividing by that span
+  // is what the guard exists to stop.
+  const snapshot = snapshotWithDeclaredWindow(
+    { since: '2026-09-01T12:02:55Z', until: '2026-09-01T12:02:55Z' },
+    { keepPullRequests: [5992] },
+  );
+
+  it('collapses the history to one instant', () => {
+    expect(historyBounds(snapshot)).toEqual({
+      from: '2026-09-01T12:02:55Z',
+      to: '2026-09-01T12:02:55Z',
+    });
+  });
+
+  it('still emits the requested buckets rather than dividing by a zero span', () => {
+    const series = volumeSeries(snapshot, 8);
+
+    expect(series).toHaveLength(8);
+    expect(series.every((bucket) => Number.isInteger(bucket.count))).toBe(true);
+  });
+
+  it('still counts the merge that sits on that instant', () => {
+    const series = volumeSeries(snapshot, 8);
+
+    expect(series.reduce((sum, bucket) => sum + bucket.count, 0)).toBe(1);
+    expect(series[0].count).toBe(1);
+  });
+});
+
 describe('volumeSeries — a merge landing exactly on the upper bound (T003)', () => {
   // `until` is PR 5992's own merge timestamp, so the history ends exactly on a merge and
   // that merge's offset is the full span. Without the final-bucket clamp its bucket index

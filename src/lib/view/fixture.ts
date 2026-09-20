@@ -31,8 +31,26 @@ export function loadSnapshot(name: string = XYFLOW_SNAPSHOT_FILE): Snapshot {
  * Same technique as `transcriptWithReversedListing` in `src/lib/ingest/fixtures/replay.ts`:
  * vary one property of the producer's real output rather than hand-rolling an
  * approximation of it. The snapshot file itself is never edited — Principle 4.
+ *
+ * `keepPullRequests` narrows the result to the named pull requests, which is how a
+ * single-instant history is built: one real pull request, with the declared window set to
+ * its own merge time. `metadata.pullRequestCount` follows, so the snapshot stays
+ * internally consistent rather than claiming a count it no longer carries.
  */
-export function snapshotWithDeclaredWindow(window: { since: string; until: string }): Snapshot {
+export function snapshotWithDeclaredWindow(
+  window: { since: string; until: string },
+  options: { keepPullRequests?: readonly number[] } = {},
+): Snapshot {
   const snapshot = loadSnapshot();
-  return snapshotSchema.parse({ ...snapshot, metadata: { ...snapshot.metadata, window } });
+  const keep = options.keepPullRequests;
+  const pullRequests =
+    keep === undefined
+      ? snapshot.pullRequests
+      : snapshot.pullRequests.filter((pullRequest) => keep.includes(pullRequest.number));
+
+  return snapshotSchema.parse({
+    ...snapshot,
+    metadata: { ...snapshot.metadata, window, pullRequestCount: pullRequests.length },
+    pullRequests,
+  });
 }

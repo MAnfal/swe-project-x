@@ -70,6 +70,16 @@ export const DEFAULT_BUCKET_COUNT = 64;
  * The declared ingest window is the authority — it is what was asked for and what the
  * snapshot claims to cover — but a merge that landed outside it would otherwise be
  * unreachable by any range, so the bounds widen to contain every pull request present.
+ * The comparisons are strict: a merge sitting exactly on a bound leaves that bound
+ * reported as declared.
+ *
+ * **The widening is defensive, and this repository's own ingester cannot trigger it.**
+ * `fetchMergedPullRequests` (`src/lib/ingest/github.ts`) drops any pull request outside
+ * `[since, until)` before it is written, and `ingestRepository` copies those same bounds
+ * into `metadata.window`, so every merge in a snapshot it produced is already inside the
+ * declared window. What this defends is the *schema* boundary, which admits more than the
+ * ingester emits — Principle 5 says the view renders anything `snapshotSchema` validates,
+ * whatever produced it. Same status as `layoutGraph`'s known-node guard.
  */
 export function historyBounds(snapshot: Snapshot): HistoryBounds {
   let from = Date.parse(snapshot.metadata.window.since);
@@ -98,6 +108,13 @@ export function historyBounds(snapshot: Snapshot): HistoryBounds {
  * Every bucket is emitted, including the empty ones — a window with no activity is a zero
  * bar, not a gap, so the bars stay on a linear time axis and a quiet stretch reads as
  * quiet rather than as missing.
+ *
+ * The span floor below is defensive in the same way, but for a case the schema really does
+ * admit: measured on zod 4.6.5, `snapshotSchema` parses a window whose `since` equals — or
+ * even follows — its `until`, because nothing cross-checks the two fields. `ingestRepository`
+ * rejects such a window before it starts, so no snapshot this repository produced can carry
+ * one; a snapshot from anywhere else can, and dividing by that span would silently emit
+ * `NaN` bucket counts instead of bars.
  */
 export function volumeSeries(snapshot: Snapshot, bucketCount: number = DEFAULT_BUCKET_COUNT): VolumeBucket[] {
   if (bucketCount < 1) throw new Error(`bucketCount must be at least 1, got ${bucketCount}`);

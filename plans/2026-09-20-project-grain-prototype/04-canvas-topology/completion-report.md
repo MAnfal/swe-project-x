@@ -12,6 +12,70 @@ this chunk's first commit is `de50039` (2026-09-20 08:48 -0700); `git merge-base
 here. Pages 1, 4, 7, 10 and 11 were opened and read before the corresponding presentation
 component was written, and every deviation from them is listed in § Deviations.
 
+## Review iteration 2 — what changed in response
+
+Verdict FAIL on three further survivors, all in the two functions iteration 1 had just
+touched. Iteration 1's fix killed the two mutants it was given and left the surrounding
+guarantee unpinned — the predictable shape of fixing against a named list. This pass closes
+the whole neighbourhood of both functions: both comparison operators in the widening loop,
+and the span floor.
+
+| Issue | Fix | Evidence |
+| ----- | --- | -------- |
+| `derive.ts:82` `merged < from` → `<=` survived | `keeps the declared lower bound when the oldest merge sits exactly on it` | § Mutation kills, mutant D |
+| `derive.ts:86` `merged > to` → `>=` survived | `keeps the declared upper bound when the newest merge sits exactly on it` | § Mutation kills, mutant E |
+| `derive.ts:108` `Math.max(end - start, 1)` → `end - start` survived | three cases under `volumeSeries — a history with no width` | § Mutation kills, mutant F |
+| Guards presented as load-bearing when the ingester cannot reach them | Reachability disclosed in `derive.ts`'s doc comments and below | § Reachability of the two guards |
+| Design page 10's `⇕ resize` | Deferred by lead decision; not an implementation gap | § Deviations, "Design page 10" |
+
+**`derive.ts`'s executable code is unchanged.** The only edit is to two doc comments.
+Verified two ways: the diff contains no non-comment line, and stripping comments and blank
+lines from both revisions gives byte-identical files at 175 lines each.
+
+```
+$ git diff -U0 src/lib/view/derive.ts | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' \
+    | grep -vE '^[+-][[:space:]]*(\*|/\*\*|\*/)'
+(no output)
+$ diff <(strip f4715d5:src/lib/view/derive.ts) <(strip src/lib/view/derive.ts)
+IDENTICAL — derive.ts's executable code is unchanged
+--- line counts:      175 vs      175
+```
+
+### Reachability of the two guards — checked against the producer, not assumed
+
+The reviewer's warning is correct, and re-derived here rather than taken on trust:
+
+- `fetchMergedPullRequests` (`src/lib/ingest/github.ts`) contains
+  `if (pr.merged_at < bounds.since || pr.merged_at >= bounds.until) continue;`, so every
+  pull request written into a snapshot satisfies `since <= merged_at < until`.
+- `ingestRepository` (`src/lib/ingest/ingest.ts`) copies those same bounds into
+  `metadata.window`, and — stronger than the review stated — **rejects a non-positive
+  window before it starts**: `if (!(options.since < options.until)) throw new Error('the
+  window … is empty — since must be before until')`.
+
+So on this repository's own ingester output the widening loop can never fire and the span
+can never be zero. **But the schema admits both**, and Principle 5 says the view renders
+whatever `snapshotSchema` validates, whatever produced it. Measured directly:
+
+```
+zero-width window parses: true
+inverted window parses:   true
+```
+
+That splits the three guards honestly, and the split is now written into `derive.ts`:
+
+- **The widening loop is defensive only.** Nothing this repository produces enters it.
+  Disclosed in `historyBounds`'s doc comment, in the same terms `layoutGraph`'s known-node
+  guard already uses.
+- **The span floor is genuinely reachable at the schema boundary.** A zero-width window
+  parses clean, and without the floor `offset / span` is `0 / 0` → `NaN` → `counts[NaN]`,
+  which writes a string property instead of an array slot: the merge is **silently
+  dropped**, no error, no `NaN` in the output, just a bar that isn't there. Mutant F's kill
+  is exactly that — `expected +0 to be 1`.
+
+A guard being defensive is fine; presenting it as load-bearing was the defect, and that is
+what changed.
+
 ## Review iteration 1 — what changed in response
 
 Verdict was FAIL on three blocking items. All three are addressed; the non-blocking focus +
@@ -80,9 +144,9 @@ Changed in response to review iteration 1:
 
 ## Tests
 
-`pnpm test` reported **94 passed (94)** on the base tree and **144 passed (144)** now — 50
-new assertions across four new spec files (135 before review iteration 1, plus the nine
-cases added to kill the three mutants below).
+`pnpm test` reported **94 passed (94)** on the base tree and **149 passed (149)** now — 55
+new assertions across four new spec files: 135 as first reviewed, +9 in review iteration 1
+(mutants A–C), +5 in review iteration 2 (mutants D–F).
 
 | Test | Red run (before implementation) | Green run |
 | ---- | ------------------------------- | --------- |
@@ -91,8 +155,9 @@ cases added to kill the three mutants below).
 | `derive.test.ts > nearestActivity` (three cases, added for the empty state) | `TypeError: nearestActivity is not a function` at `src/lib/view/derive.test.ts:288:12` → `Tests 3 failed \| 132 passed (135)` | as above |
 | `src/lib/view/catalog.test.ts` (five cases) | `FAIL src/lib/view/catalog.test.ts` / `Error: Cannot find package '@/lib/view/catalog' imported from …/src/lib/view/catalog.test.ts` → `Test Files 1 failed \| 9 passed (10)` | as above |
 
-The nine cases added in review iteration 1 were written against code that was **already
-correct**, so there is no "module missing" red run for them. Their red run is the mutant:
+The fourteen cases added in review iterations 1 and 2 were written against code that was
+**already correct**, so there is no "module missing" red run for them. Their red run is the
+mutant:
 each was verified by re-applying the mutation it exists to catch and watching it fail by
 name. That evidence is in § Mutation kills below — it is the only thing that proves those
 tests can fail.
@@ -108,23 +173,23 @@ Baseline captured on the base tree (`a2b8565`) in this worktree before any edit,
 `pnpm typecheck` exit 0 with no output, `pnpm build` exit 0. **Zero pre-existing errors and
 zero warnings**, so every result below is also the delta.
 
-All four standard gates were re-run **after the last edit** of review iteration 1, in
-order, type check last. Counts below are the post-iteration-1 run.
+All four standard gates were re-run **after the last edit** of review iteration 2, in
+order, type check last. Counts below are the post-iteration-2 run.
 
 | Gate | Command | Result | Fails on base? |
 | ---- | ------- | ------ | -------------- |
 | Lint | `pnpm lint` | exit 0, no output | No — base is clean too. `pnpm exec eslint --max-warnings 0` also exits 0 with no output, so "lint passed" here does mean "lint had nothing to say" |
-| Unit tests | `pnpm test` | exit 0, `Test Files 10 passed (10)` / `Tests 144 passed (144)` | Yes, for this chunk's specs: on base they fail to import (`Cannot find package '@/lib/view/derive'`). The base suite itself passes at 94 |
+| Unit tests | `pnpm test` | exit 0, `Test Files 10 passed (10)` / `Tests 149 passed (149)` | Yes, for this chunk's specs: on base they fail to import (`Cannot find package '@/lib/view/derive'`). The base suite itself passes at 94 |
 | Build | `pnpm build` | exit 0, `✓ Compiled successfully`, `Finished TypeScript in 2.1s`, `Route (app) ┌ ○ /` — statically prerendered | No — base builds clean. Falsified by canary instead (below) |
 | Type check | `pnpm typecheck` | exit 0, no output | No — base is clean. Falsified by canary instead (below) |
 | Gate 2 — no curated repository name in source | see script below | exit 0, `gate 2: scanning 38 source files` / `gate 2: PASS` | **No, and it cannot.** See the honest note below |
 | Gate 3 — inactive is not colour alone | see script below | exit 0, `gate 3: PASS — the states differ by non-colour properties, not hue alone` with `inactive: 76: 'border-dashed border-muted-foreground/50 bg-transparent opacity-45'` and `active: 77: : 'border-solid bg-card shadow-sm'` | **Yes**, exit 1: `FAIL: src/components/canvas/package-node.tsx is missing — the gate has nothing to check` |
 
-Final run, after the last edit of review iteration 1:
+Final run, after the last edit of review iteration 2:
 
 ```
 ### pnpm lint      -> exit 0   (pnpm exec eslint --max-warnings 0 -> exit 0)
-### pnpm test      -> exit 0   Test Files  10 passed (10) / Tests  144 passed (144)
+### pnpm test      -> exit 0   Test Files  10 passed (10) / Tests  149 passed (149)
 ### pnpm build     -> exit 0   Route (app) ┌ ○ /   ○  (Static)  prerendered as static content
 ### pnpm typecheck -> exit 0
 ### gate 2         -> exit 0   gate 2: scanning 38 source files / PASS
@@ -410,6 +475,55 @@ AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
 layout.ts restored byte-for-byte
 ```
 
+### Mutants D and E — the widening loop's comparison operators
+
+Iteration 1's `volumeSeries` test set `until` equal to a pull request's own `mergedAt`, so
+nothing was ever *strictly* greater than `to` and `historyBounds`' tie branch was never
+decided. These two cases decide it: the declared bound and the merge name the **same
+instant in different spellings**, so `<` and `<=` (and `>` and `>=`) produce different
+output and the assertion can tell them apart.
+
+Mutation D: `if (merged < from)` → `if (merged <= from)`.
+
+```
+pnpm test -> exit 1
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge sitting exactly on a declared bound (T003) > keeps the declared lower bound when the oldest merge sits exactly on it
+AssertionError: expected { from: '2026-08-31T09:22:57Z', …(1) } to deeply equal { …(2) }
+      Tests  1 failed | 148 passed (149)
+```
+
+Mutation E: `if (merged > to)` → `if (merged >= to)`.
+
+```
+pnpm test -> exit 1
+ FAIL  src/lib/view/derive.test.ts > historyBounds — a merge sitting exactly on a declared bound (T003) > keeps the declared upper bound when the newest merge sits exactly on it
+AssertionError: expected { from: '2026-08-31T00:00:00Z', …(1) } to deeply equal { from: '2026-08-31T00:00:00Z', …(1) }
+      Tests  1 failed | 148 passed (149)
+```
+
+The property being pinned is a real one, not a formatting accident: **the declared bound is
+reported verbatim unless a merge falls strictly outside it.** `volumeSeries` anchors its
+first and last bucket edges to those exact strings, so a bound that silently re-spells
+itself from whichever pull request happened to tie would make the series' extent depend on
+the producer's timestamp formatting.
+
+### Mutant F — the span floor
+
+Mutation: `const span = Math.max(end - start, 1);` → `const span = end - start;`.
+
+```
+pnpm test -> exit 1
+ FAIL  src/lib/view/derive.test.ts > volumeSeries — a history with no width (T003) > still counts the merge that sits on that instant
+AssertionError: expected +0 to be 1 // Object.is equality
+      Tests  1 failed | 148 passed (149)
+```
+
+The case is one real pull request (5992) with the declared window set to its own merge
+instant, so `historyBounds` collapses to a point. `0 / 0` is `NaN`, and `counts[NaN] += 1`
+sets a **string property** on the array rather than an element — so the array keeps its
+length, every bucket stays `0`, and the change vanishes with no error and no `NaN` anywhere
+a caller would see it. That is why the assertion is on the total rather than on the shape.
+
 ### Focus and the empty state (the reviewer's warning)
 
 `grain-workspace.tsx` now routes both the slider and the empty state through `changeRange`,
@@ -633,8 +747,13 @@ param is part of what preserves that (see § Judgment calls).
   The footer hint now reads
   `← → nudge an hour · Home / End jump to repo start / end · Tab reaches each handle`.
 
-  **`⇕ resize` is deliberately not built.** Two reasons, and I would rather state them than
-  ship a guess. First, the mid-fi specifies neither the anchor nor the amount — "resize" a
+  **`⇕ resize` is not built — deferred by lead decision at review iteration 2.** The
+  reviewer re-opened page 10 and confirmed that none of its four state cards fixes the
+  gesture's anchor or amount, which makes this a gap in the design rather than in the
+  implementation. The lead has taken the decision: do not build it, file it as an idea with
+  its own boundary, and add the Design Decision. This section stands as the record of what
+  was found; the resolution lives with the lead's idea, not here. My original reasoning,
+  which the lead accepted, follows. First, the mid-fi specifies neither the anchor nor the amount — "resize" a
   range could mean widen/narrow about its centre, about the focused handle, or about the
   fixed handle, by one step or one large step, and page 10's four state cards (REST,
   DRAGGING, HANDLE FOCUSED, PRESET APPLIED) do not describe it. Second, `⇕` means the
@@ -733,6 +852,30 @@ Not edited here, as instructed. Each item below was measured in this worktree on
   reads "1 day · no activity". The designs' readout is day-granular and every design example
   is multi-day; changing it would mean a second time format for a case the designs never
   show.
+- **The session scratchpad is shared between parallel agents, and it silently corrupted a
+  gate run.** My gate scripts lived at
+  `…/71fa1585-…/scratchpad/gate2.sh`. On the final iteration-3 run that script produced
+  `FAIL: expected a committed snapshot per curated repository, found 1` — a message I never
+  wrote. The file had been overwritten (timestamp 09:37, mine was 08:55) with what is
+  plainly **chunk 03's** gate 2: it counts committed snapshots and asserts every pull
+  request carries enrichment. Nothing was wrong with chunk 04; a different chunk's gate was
+  running against my tree. Re-created mine as `chunk04-gate2.sh`, re-ran it and its three
+  negative controls, all correct. Flagging it because the failure mode is quiet in the
+  dangerous direction too — a *passing* borrowed gate would have read as evidence. Worth a
+  per-chunk filename convention, or per-agent scratchpad isolation, for the next parallel
+  wave.
+- **The slider's footer hint does not mention Up/Down**, although the unmodified primitive
+  already gives the focused thumb's Up/Down the same effect as Left/Right. Raised as a
+  non-blocking warning in review iteration 2 and deliberately not acted on: the lead scoped
+  iteration 3 to the three mutants plus the disclosure, and a free affordance is better
+  documented alongside whatever decision settles `⇕ resize` than bolted onto the hint string
+  now. One-word change when someone wants it.
+- **The lower clamp in `volumeSeries`, `Math.max(0, …)`, remains unpinned.** It is
+  unreachable: `volumeSeries` derives `start` from `historyBounds(snapshot)`, which is
+  already widened down to the earliest merge, so `offset` cannot be negative for *any*
+  snapshot the schema admits — not merely for ingester output. Under the lead's stopping
+  rule this is a warning, not a blocker, and writing a test for it would mean writing one
+  that cannot distinguish anything.
 - **`src/lib/ingest/github.ts` exports a `WindowBounds` type** (`{since, until, …}`) that
   looks like this chunk's `DateRange`. It is not the same concept — it parameterizes the
   GitHub listing query — so it was not reused or consolidated. Noted in § Reuse audit.
