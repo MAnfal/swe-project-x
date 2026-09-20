@@ -36,12 +36,28 @@ disk, and run each command before writing it into the table.
 
 ## Stack
 
-<!-- Language, runtime, framework, package manager, test framework — each with the version
-     actually resolved on disk, and the date it was read. Not the manifest's ranges. -->
+Versions read from `node_modules/<pkg>/package.json` on **2026-09-20**, not from the
+ranges in `package.json`. Toolchain versions from `node --version` / `pnpm --version`.
 
-- **Language / runtime**:
-- **Package manager**:
-- **Test framework**:
+- **Language / runtime**: TypeScript 5.9.3 on Node.js v24.13.0
+- **Framework**: Next.js 16.3.5 (App Router, Turbopack) with React 19.2.8
+- **Package manager**: pnpm 9.15.4 (pinned in `package.json` as `packageManager`)
+- **Test framework**: Vitest 5.0.1 (on Vite 8.3.0)
+- **Styling / UI**: Tailwind CSS 4.3.3; shadcn/ui 4.21.0 CLI on the `base-nova` preset,
+  which builds on `@base-ui/react` 1.8.0 (not Radix) and `lucide-react` 1.47.0
+- **Lint**: ESLint 9.39.5 with `eslint-config-next` 16.3.5 (flat config)
+- **Deployment target**: Vercel — no writable filesystem and no git binary at request time
+
+Dependencies later chunks are built on, all resolved 2026-09-20:
+
+| Package | Installed | Used by |
+| ------- | --------- | ------- |
+| `@xyflow/react` | 12.11.6 | canvas (chunks 04, 05) |
+| `@dagrejs/dagre` | 3.1.1 | graph layout (chunk 04) — ships its own types, no `@types/dagre` |
+| `@octokit/rest` | 22.0.1 | GitHub ingest (chunks 02, 06) |
+| `zod` | 4.6.5 | snapshot schema, model output schema (02, 03) |
+| `ai` | 7.0.107 | model calls (chunks 03, 06) |
+| `@ai-sdk/anthropic` | 4.0.58 | Anthropic provider (chunks 03, 06) |
 
 ## Commands
 
@@ -54,21 +70,37 @@ symlinking dependencies, linking gitignored files the app needs (`.env` and frie
 any codegen. It runs once per worktree, before an implementer is dispatched into it. Get
 this wrong and every chunk's first gate run fails for reasons unrelated to its work.
 
-<!-- State where commands run from if it is not the repository root. -->
+All commands run from the repository root.
 
 | Gate | Command |
 | ---- | ------- |
-| Install | |
-| Bootstrap a fresh worktree | |
-| Type check | |
-| Lint | |
-| Unit tests | |
-| Build | |
-| Run the app | |
+| Install | `pnpm install` |
+| Bootstrap a fresh worktree | `pnpm install` (plus `cp .env.example .env.local` and fill it in, for any chunk that calls the GitHub or Anthropic API) |
+| Type check | `pnpm typecheck` |
+| Lint | `pnpm lint` |
+| Unit tests | `pnpm test` |
+| Build | `pnpm build` |
+| Run the app | `pnpm dev` — serves http://localhost:3000 |
 
-<!-- Record any command whose behaviour is surprising — an exit code that does not mean
-     what it looks like, a needle that can never fail, a scope that is narrower than it
-     appears. A gate written against the assumption instead of the measurement is vacuous. -->
+**Run the type check last.** `pnpm test` (Vitest) and `pnpm dev` (Turbopack) transpile
+without type-checking and pass errors `tsc` catches. `pnpm build` does run TypeScript, but
+only over what the build graph reaches — a module no route imports yet is type-checked by
+`pnpm typecheck` and by nothing else.
+
+Command behaviour that is not what it looks like:
+
+- **`pnpm test --run` does not reach Vitest.** pnpm consumes `--run` as its own option and
+  fails with `ERROR Unknown option: 'run'` before the script starts. Use `pnpm test` (the
+  script is already `vitest run`) or `pnpm test -- --run`. The bare failure mode is
+  dangerous in a gate: it exits non-zero for a reason unrelated to any test.
+- **`pnpm lint` runs `eslint` with no path argument**, which lints the whole project
+  directory under the flat config. Measured 2026-09-20: 15 files, including
+  `vitest.config.mts` and specs under `src/`. It is not a vacuous no-file run.
+- **A zero exit from `pnpm test` does not mean your spec ran.** Measured 2026-09-20 on
+  vitest@5.0.1: when the include pattern matches *nothing at all* it exits 1 with
+  `No test files found, exiting with code 1`. But a spec that sits outside
+  `src/**/*.test.{ts,tsx}` while other specs match is skipped silently and the run still
+  exits 0. Assert the passing count the runner reports, not the exit status alone.
 
 ## Principles
 
@@ -81,11 +113,42 @@ Amend deliberately: a principle changed mid-plan invalidates the reasoning of ev
 approved under it, so record the date and the reason when one changes, and note which
 version each plan was checked against.
 
-<!-- Until this section has content, plan-check Step 3b has nothing to check against and
-     the rubric's "no principle violated" item grades N/A. That is the expected state for a
-     bootstrap plan's first chunk and nowhere else. -->
+Written 2026-09-20 by chunk 01 of `2026-09-20-project-grain-prototype`, derived from that
+plan's Design Decisions and Plan-Specific Constraints. Chunks 02–06 are the first work
+checked against them.
 
-1.
+1. **A credential never reaches the client.** `GITHUB_TOKEN` and `ANTHROPIC_API_KEY` are
+   read only inside route handlers and scripts. Violation: either name read in a file that
+   is not a route handler or a `scripts/` module, any `NEXT_PUBLIC_*` variable holding a
+   credential, or a committed `.env`. A token reaching a client bundle is published to
+   every visitor.
+
+2. **No model call sits between a click and a frame.** Enrichment is a separate pass keyed
+   by merge SHA — baked into committed snapshots ahead of time, or generated once per pull
+   request on expand and reused for the session. Violation: an `ai` or `@ai-sdk/*` import
+   in a component, or a model call reached while rendering. Nothing the canvas draws may
+   wait on a model.
+
+3. **Nothing depends on a writable filesystem or a git subprocess at request time.** The
+   deploy target has neither. Violation: `fs.write*`, a temp-directory write, or a
+   `child_process` call to `git` on any path reachable from a route handler. Read-only
+   reads of committed files are fine; ingest is GitHub API work only.
+
+4. **Fixtures and snapshots are captured output of the real producer.** A data file under
+   test is generated by running the ingester and committing what it wrote. Violation: JSON
+   hand-authored to look like an API response or a snapshot. Hand-rolled fixtures exercise
+   only the simple case, and the divergence surfaces as a bug in the path that was never
+   tested — see `.claude/resources/bibles/swe/testing.md`.
+
+5. **One snapshot schema, one ingest path.** Everything the view renders is a snapshot that
+   the Zod schema validates, whether it came from a committed file or a live request.
+   Violation: the view branching on provenance, a second schema for live results, or a
+   raw GitHub response reaching a component.
+
+6. **Every live ingest is bounded before it starts.** The window and the pull-request count
+   are capped at the call site, not discovered mid-loop. Violation: a paginated fetch with
+   no ceiling on a user-supplied repository. An unbounded fetch spends the owner's GitHub
+   rate limit and model budget on one URL.
 
 A chunk that violates a principle needs an explicit justification in the plan's Design
 Decisions, or it doesn't ship. "This was easier" is not a justification.
@@ -110,22 +173,36 @@ one.
 
 | Files | Gates | Review checks | Doc |
 | ----- | ----- | ------------- | --- |
-| | | | |
-
-<!-- Rows worth adding once the stack exists, as illustrations of the shape:
-
-| `src/**/*.service.*` | <test>, <lint> | interface-first; the contract is its own module
-  and the implementation declares it | `.claude/resources/bibles/swe/patterns/service-design.md` |
-| `.claude/**/*.md` | `—` | frontmatter matches the documented schema; SKILL.md under 500
-  lines; description leads with the use case | `.claude/resources/bibles/prompt-engineering/decision-tree.md` |
--->
+| `src/components/**/*.tsx`, `src/app/**/page.tsx`, `src/app/**/layout.tsx` | `pnpm lint`, `pnpm build`, `pnpm typecheck` | No `ai`/`@ai-sdk/*` import and no model call (Principle 2); no `process.env` read of a credential (Principle 1); renders a schema-validated snapshot rather than a raw API shape (Principle 5); a state distinction is never carried by colour alone | — |
+| `src/components/ui/**` | `pnpm lint`, `pnpm typecheck` | Generated by `pnpm dlx shadcn@latest add <name>`; not hand-authored and not hand-edited. Re-run the CLI instead of patching a primitive | — |
+| `src/lib/**/*.ts` | `pnpm test`, `pnpm lint`, `pnpm typecheck` | Standalone functions over plain objects — no class hierarchy, registry or provider interface with one implementation; no `fs` write and no `child_process` (Principle 3); each module has a co-located spec | — |
+| `src/app/**/route.ts` | `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm typecheck` | `export const runtime = 'nodejs'` when it touches Octokit or the AI SDK — the Edge runtime supports neither; thin — sequences and wires `src/lib/` functions, holds no domain logic; bounds every fetch before starting it (Principle 6); reads credentials here, never below (Principle 1) | `.claude/resources/bibles/swe/patterns/orchestrator-pattern.md` |
+| `src/**/*.test.ts`, `src/**/*.test.tsx` | `pnpm test`, `pnpm lint`, `pnpm typecheck` | Asserts the value a consumer receives after resolution, never reads back the literal it passed in; a transform over a producer's output is tested against that producer's real captured output, not a hand-rolled approximation | `.claude/resources/bibles/swe/testing.md` |
+| `src/**/fixtures/**/*.json`, `src/**/snapshots/**/*.json` | `pnpm test` | Captured output of the real ingester, committed as written (Principle 4). Carries the incidental fields a real API response has and a hand-written file would not bother with; regenerated by re-running the producer, never edited by hand | `.claude/resources/bibles/swe/testing.md` |
+| `package.json`, `tsconfig.json`, `vitest.config.mts`, `eslint.config.mjs`, `next.config.ts`, `components.json` | `pnpm install`, `pnpm build`, `pnpm typecheck` | Changed by the tool that owns it where one exists (`pnpm add`, the shadcn CLI) rather than hand-edited; a new dependency or command is recorded in this file in the same chunk | — |
 
 **Anything under `.claude/` is governed by the prompt-engineering bible** whether or not a
 row above matches it. `generate-chunk-rubric` adds those citations on its own — see that
 skill's "When the chunk touches `.claude/` itself".
 
-**Test file convention**: <!-- where specs live, how they are named, and what the runner's
-include patterns actually match. A spec the runner never matches passes by not running. -->
+**The `src/lib/**` row has no `Doc` on purpose — do not "fix" it.** The SWE decision tree
+routes "design a new service or module with a public API" to
+`.claude/resources/bibles/swe/patterns/service-design.md`, but that page's § "Interface-first
+(mandatory for shared services)" requires an interface in `contracts/`, an `@Injectable()`
+class implementing it, and a NestJS provider token (§ "NestJS provider registration") — a
+DI-container pattern for swapping implementations. `src/lib/` here is standalone functions
+over plain objects with exactly one implementation each, which ORCHESTRATOR.md § Complexity
+rejects the alternative to by name: *"an abstraction with exactly one implementation, built
+for a non-goal."* The routing row matches on the words, not the situation. Ruled on
+2026-09-20 by the plan lead, who read the page: the plan's Complexity decision wins, and the
+row ships its review checks uncited rather than citing a page that contradicts the design.
+Read the two named sections before reopening this.
+
+**Test file convention**: specs are co-located with the module they cover, named
+`<module>.test.ts` (or `.test.tsx`), and live under `src/`. `vitest.config.mts` includes
+exactly `src/**/*.test.{ts,tsx}`; a spec outside `src/` is never discovered and passes by
+not running. Verified 2026-09-20: `src/lib/utils.test.ts` is matched and executed —
+`pnpm test` reports `Test Files 1 passed (1) / Tests 3 passed (3)`.
 
 ## Conventions
 
@@ -133,14 +210,52 @@ Things an implementing agent would otherwise get wrong. Add to this as they surf
 convention learned during execution belongs here in the same change that learned it, not in
 a follow-up.
 
--
+- **Do not delete `AGENTS.md`.** `next dev` regenerates agent files on every start. With
+  `AGENTS.md` present and hosting the rules block it writes there and skips `CLAUDE.md`;
+  with `AGENTS.md` absent it writes the Next.js block into `CLAUDE.md` instead, clobbering
+  this project's instructions. See `writeAgentFiles` in
+  `node_modules/next/dist/server/lib/generate-agent-files.js` (next@16.3.5).
+- **`.gitignore` ignores `.env*`**, so `.env.example` is committed only because of an
+  explicit `!.env.example` negation at the end of the file. Any other committed env
+  template needs its own negation.
+- **The Vitest config is `vitest.config.mts`, not `.ts`.** `package.json` has no
+  `"type": "module"`, so a `.ts` config is loaded as CommonJS and Vite 8 warns that ESM
+  syntax there is unsupported by the incoming native config loader.
+- **Do not add `vite-tsconfig-paths`.** Vite 8.3.0 resolves tsconfig paths natively via
+  `resolve: { tsconfigPaths: true }`, which is what `vitest.config.mts` sets. The alias
+  mapping is therefore read from `tsconfig.json` and is never restated — add a path there
+  and the runner picks it up.
+- **`cn` is re-exported, not defined here.** `src/lib/utils.ts` is
+  `export { cn } from "cn"` — the shadcn `base-nova` preset depends on the `cn` package
+  (0.3.0) rather than inlining `clsx` + `tailwind-merge`. Do not rewrite it by hand.
+- **`shadcn init` is only non-interactive with all three choices supplied**:
+  `pnpm dlx shadcn@latest init --base base --preset nova --no-monorepo --yes`. With
+  `--yes` alone it still prompts for the component library and the preset and hangs.
+- **`find node_modules/...` does not follow pnpm's symlinks**, so it reports a package's
+  files as absent. Use `find -L`, or read the manifest with `node -e`, before concluding a
+  package ships no types.
 
 ## Layout
 
 Where things live, and what belongs where.
 
 ```
+src/
+  app/          Next.js App Router. Pages and layouts render; route handlers
+                (app/**/route.ts) are the ONLY place a credential is read and the
+                only place a model call or a GitHub call may originate.
+  components/
+    ui/         shadcn/ui primitives, generated by the CLI. Not hand-edited.
+    */          Presentation components for this app. No data fetching, no model calls.
+  lib/          Standalone functions over plain objects — ingest, enrichment, view
+                derivation, the snapshot schema. No React, no request context, no fs
+                writes, no git subprocess. Each module has a co-located *.test.ts.
+public/         Static assets served as-is.
+.claude/        The spec-driven loop: prompts, bibles, skills, and this file.
+plans/          Plan directories — one per plan, with SPEC, chunks and retro.
 ```
 
-<!-- Call out the boundaries the Principles police, so a reader can tell which side of a
-     line a new file belongs on. -->
+The boundary the Principles police is `src/app/**/route.ts` against everything else:
+secrets, network calls and model calls live on the route side of it; `src/lib/` is pure
+functions that take data and return data, and `src/components/` renders what it is handed.
+A file that needs a token or a model is in the wrong directory, not missing an import.
