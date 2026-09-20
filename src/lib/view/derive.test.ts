@@ -4,9 +4,11 @@ import {
   activityOf,
   deriveWindow,
   historyBounds,
+  nearestActivity,
   neighbourhood,
   presetRange,
   volumeSeries,
+  type DateRange,
 } from '@/lib/view/derive';
 
 import { loadSnapshot } from './fixture';
@@ -258,5 +260,31 @@ describe('neighbourhood', () => {
     const view = deriveWindow(snapshot, WHOLE);
 
     expect([...neighbourhood(view, 'playwright')]).toEqual(['playwright']);
+  });
+});
+
+describe('nearestActivity', () => {
+  it('offers a range of the same width containing the closest merge', () => {
+    // Nothing landed before 09:22:57Z on 2026-08-31; the six-hour window is empty.
+    const empty = { from: '2026-08-31T00:00:00Z', to: '2026-08-31T06:00:00Z' };
+    const nearest = nearestActivity(snapshot, empty);
+
+    expect(nearest).not.toBeNull();
+    expect(deriveWindow(snapshot, nearest as DateRange).changeCount).toBeGreaterThan(0);
+    expect(Date.parse((nearest as DateRange).to) - Date.parse((nearest as DateRange).from)).toBe(
+      Date.parse(empty.to) - Date.parse(empty.from),
+    );
+  });
+
+  it('stays inside the history it was given', () => {
+    const history = historyBounds(snapshot);
+    const nearest = nearestActivity(snapshot, { from: '2026-08-31T00:00:00Z', to: '2026-08-31T06:00:00Z' });
+
+    expect(Date.parse((nearest as DateRange).from)).toBeGreaterThanOrEqual(Date.parse(history.from));
+    expect(Date.parse((nearest as DateRange).to)).toBeLessThanOrEqual(Date.parse(history.to));
+  });
+
+  it('returns null when the range already has activity', () => {
+    expect(nearestActivity(snapshot, historyBounds(snapshot))).toBeNull();
   });
 });

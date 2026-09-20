@@ -214,6 +214,45 @@ export function deriveWindow(snapshot: Snapshot, range: DateRange): WindowView {
   };
 }
 
+/**
+ * A range of the same width as `range` that does contain activity, or null when `range`
+ * already does.
+ *
+ * The empty state offers to jump rather than leaving the reader to hunt for the nearest
+ * merge by dragging. Same width, so the jump changes *when* they are looking and not how
+ * much they are looking at, and clamped to the history so the slider can represent it.
+ */
+export function nearestActivity(snapshot: Snapshot, range: DateRange): DateRange | null {
+  const from = Date.parse(range.from);
+  const to = Date.parse(range.to);
+  const width = Math.max(to - from, 0);
+
+  let nearest: number | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const pullRequest of snapshot.pullRequests) {
+    const merged = Date.parse(pullRequest.mergedAt);
+    if (merged >= from && merged <= to) return null; // the range already has activity
+    const distance = merged < from ? from - merged : merged - to;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      nearest = merged;
+    }
+  }
+  if (nearest === null) return null;
+
+  const history = historyBounds(snapshot);
+  const historyStart = Date.parse(history.from);
+  const historyEnd = Date.parse(history.to);
+
+  // Centre the same-width window on the nearest merge, then slide it back inside the
+  // history rather than clipping it, so the offered range keeps its width.
+  let start = nearest - width / 2;
+  if (start + width > historyEnd) start = historyEnd - width;
+  if (start < historyStart) start = historyStart;
+
+  return { from: new Date(start).toISOString(), to: new Date(Math.min(start + width, historyEnd)).toISOString() };
+}
+
 /** The activity for one package. Throws rather than returning a zeroed stand-in for a typo. */
 export function activityOf(view: WindowView, name: string): PackageActivity {
   const entry = view.activity.find((candidate) => candidate.package === name);
