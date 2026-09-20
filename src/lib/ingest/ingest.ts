@@ -18,6 +18,7 @@ import {
   type RepositoryRef,
 } from './github.ts';
 import { discoverTopology, workspaceManifestPaths, workspacePatterns, type Topology } from './topology.ts';
+import type { AnalysisProgress } from '../live/protocol.ts';
 
 /**
  * The deterministic half of a snapshot: topology, merged pull requests, and which
@@ -27,6 +28,11 @@ import { discoverTopology, workspaceManifestPaths, workspacePatterns, type Topol
  * over data. The analysis clock is an argument rather than a call to `Date.now()`, so the
  * whole pipeline is a pure function of its inputs and `metadata` is the only part of the
  * result that varies between runs.
+ *
+ * There is one pipeline and two entry points onto it (Principle 5): `analyzeRepository`,
+ * which a route handler calls and which reports progress and what the ceiling did, and
+ * `ingestRepository`, which the CLI calls and which wants neither. The second delegates
+ * to the first, so a live analysis and a baked snapshot cannot diverge.
  */
 
 export type IngestOptions = {
@@ -41,6 +47,28 @@ export type IngestOptions = {
   maxPullRequests?: number;
   /** Defaults to the repository's default branch. */
   branch?: string;
+  /**
+   * Called as each step completes, and once per pull request through the volumetric
+   * step. Synchronous and never awaited: a slow consumer must not pace the pipeline.
+   */
+  onProgress?: (progress: AnalysisProgress) => void;
+};
+
+/** What the pull-request ceiling did to this run. */
+export type PullRequestBound = {
+  maxPullRequests: number;
+  /** Merged pull requests the window held. */
+  matched: number;
+  /** How many were analyzed — `min(matched, maxPullRequests)`. */
+  kept: number;
+  truncated: boolean;
+};
+
+export type AnalysisResult = {
+  snapshot: Snapshot;
+  bound: PullRequestBound;
+  /** The branch the topology was read from, resolved when the caller named none. */
+  branch: string;
 };
 
 export type RepositoryTopology = {
@@ -80,7 +108,13 @@ export async function discoverRepositoryTopology(
   };
 }
 
+/** The CLI's entry point: the snapshot alone, from the same pipeline. */
 export async function ingestRepository(client: GitHubClient, options: IngestOptions): Promise<Snapshot> {
+  return (await analyzeRepository(client, options)).snapshot;
+}
+
+export async function analyzeRepository(client: GitHubClient, options: IngestOptions): Promise<AnalysisResult> {
+  const report = options.onProgress ?? (() => {});
   const maxPullRequests = options.maxPullRequests ?? DEFAULT_MAX_PULL_REQUESTS;
   if (!Number.isInteger(maxPullRequests) || maxPullRequests < 1) {
     throw new Error(`maxPullRequests must be a positive integer, received ${String(options.maxPullRequests)}`);
@@ -96,20 +130,61 @@ export async function ingestRepository(client: GitHubClient, options: IngestOpti
 
   const ref = options.repository;
   const branch = options.branch ?? (await fetchDefaultBranch(client, ref));
-  const { topology } = await discoverRepositoryTopology(client, ref, branch);
+  report({ step: 'resolve', done: 1, total: 1, branch });
 
+  const { topology } = await discoverRepositoryTopology(client, ref, branch);
+  report({
+    step: 'topology',
+    done: 1,
+    total: 1,
+    packageCount: topology.nodes.length,
+    edgeCount: topology.edges.length,
+  });
+
+  // The ceiling is applied here, before a single per-pull-request request is made, which
+  // is what Principle 6 means by bounded before it starts: the volumetric cost is the
+  // files and commits calls below, and they only ever run over `merged.pullRequests`.
   const merged = await fetchMergedPullRequests(client, ref, {
     since: options.since,
     until: options.until,
     maxPullRequests,
   });
+  const bound: PullRequestBound = {
+    maxPullRequests,
+    matched: merged.matched,
+    kept: merged.pullRequests.length,
+    truncated: merged.matched > merged.pullRequests.length,
+  };
+  report({
+    step: 'pull-requests',
+    done: bound.kept,
+    total: bound.kept,
+    matched: bound.matched,
+    truncated: bound.truncated,
+  });
 
+  let read = 0;
   const detailed = await Promise.all(
-    merged.map(async (pr) => ({
-      pr,
-      files: await fetchPullRequestFiles(client, ref, pr.number),
-      commits: await fetchPullRequestCommits(client, ref, pr.number),
-    })),
+    merged.pullRequests.map(async (pr) => {
+      const files = await fetchPullRequestFiles(client, ref, pr.number);
+      const commits = await fetchPullRequestCommits(client, ref, pr.number);
+
+      read += 1;
+      report({
+        step: 'details',
+        done: read,
+        total: bound.kept,
+        read: {
+          number: pr.number,
+          title: pr.title,
+          packages: [
+            ...new Set(files.flatMap((file) => ownerOfFile(file.filename, topology.nodes) ?? [])),
+          ].sort((a, b) => a.localeCompare(b)),
+        },
+      });
+
+      return { pr, files, commits };
+    }),
   );
 
   // One closure for the whole snapshot, over every package any pull request touched.
@@ -163,6 +238,14 @@ export async function ingestRepository(client: GitHubClient, options: IngestOpti
     pullRequests,
   };
 
-  return snapshotSchema.parse(snapshot);
+  const parsed = snapshotSchema.parse(snapshot);
+  report({
+    step: 'attribute',
+    done: 1,
+    total: 1,
+    packageCount: parsed.metadata.packageCount,
+  });
+
+  return { snapshot: parsed, bound, branch };
 }
 

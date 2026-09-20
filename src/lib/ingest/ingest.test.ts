@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_MAX_PULL_REQUESTS, serializeSnapshot, snapshotSchema } from '@/lib/snapshot';
-import { ingestRepository } from '@/lib/ingest/ingest';
+import { analyzeRepository, ingestRepository } from '@/lib/ingest/ingest';
+import type { AnalysisProgress } from '@/lib/live/protocol';
 
 import {
   clientFor,
@@ -127,5 +128,89 @@ describe('ingestRepository over captured xyflow/xyflow responses', () => {
 
   it('defaults the ceiling rather than fetching everything', () => {
     expect(DEFAULT_MAX_PULL_REQUESTS).toBe(100);
+  });
+});
+
+/**
+ * The bounded entry point a route handler calls. Same pipeline as `ingestRepository` — it
+ * is what `ingestRepository` now delegates to — plus the two things a request needs that a
+ * CLI does not: what the ceiling did, and progress while it runs.
+ *
+ * The captured window holds six merged pull requests, so a ceiling of three is a real
+ * truncation against real captured output rather than a constructed one.
+ */
+describe('analyzeRepository', () => {
+  const base = {
+    repository: XYFLOW.ref,
+    since: XYFLOW.since,
+    until: XYFLOW.until,
+    branch: XYFLOW.branch,
+    analyzedAt: '2026-09-20T00:00:00.000Z',
+  };
+
+  it('reports the ceiling as untruncated when the window fits inside it', async () => {
+    const { snapshot, bound } = await analyzeRepository(replayClient(), { ...base, maxPullRequests: 100 });
+    expect(bound).toEqual({ maxPullRequests: 100, matched: 6, kept: 6, truncated: false });
+    expect(snapshot.pullRequests).toHaveLength(6);
+  });
+
+  it('stops at the ceiling and says the window held more', async () => {
+    const { snapshot, bound } = await analyzeRepository(replayClient(), { ...base, maxPullRequests: 3 });
+    expect(bound).toEqual({ maxPullRequests: 3, matched: 6, kept: 3, truncated: true });
+    expect(snapshot.pullRequests.map((pr) => pr.number)).toEqual([5992, 5997, 5994]);
+    expect(snapshot.metadata.pullRequestCount).toBe(3);
+  });
+
+  it('produces exactly the snapshot ingestRepository does, so there is one ingest path', async () => {
+    const { snapshot } = await analyzeRepository(replayClient(), base);
+    const viaIngest = await ingestRepository(replayClient(), base);
+    expect(serializeSnapshot(snapshot)).toBe(serializeSnapshot(viaIngest));
+  });
+
+  it('reports progress for every step, at least once per pull request read', async () => {
+    const seen: AnalysisProgress[] = [];
+    const { bound } = await analyzeRepository(replayClient(), {
+      ...base,
+      onProgress: (progress) => seen.push(progress),
+    });
+
+    expect(seen.map((p) => p.step).filter((step, index, all) => all.indexOf(step) === index)).toEqual([
+      'resolve',
+      'topology',
+      'pull-requests',
+      'details',
+      'attribute',
+    ]);
+
+    const details = seen.filter((progress) => progress.step === 'details');
+    expect(details).toHaveLength(bound.kept);
+    expect(details.map((progress) => progress.done)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(details.every((progress) => progress.total === bound.kept)).toBe(true);
+
+    // Each one names the pull request it just read and the packages it reached, which is
+    // what the progress view's "just read" list shows.
+    const read = details.flatMap((progress) => (progress.read ? [progress.read] : []));
+    expect(read.map((entry) => entry.number).sort((a, b) => a - b)).toEqual([5977, 5987, 5989, 5992, 5994, 5997]);
+    expect(read.every((entry) => entry.title.length > 0)).toBe(true);
+    expect(read.some((entry) => entry.packages.length > 0)).toBe(true);
+  });
+
+  it('reports the truncation on the pull-request step, before any detail is fetched', async () => {
+    const seen: AnalysisProgress[] = [];
+    await analyzeRepository(replayClient(), {
+      ...base,
+      maxPullRequests: 3,
+      onProgress: (progress) => seen.push(progress),
+    });
+
+    const listing = seen.find((progress) => progress.step === 'pull-requests');
+    expect(listing).toMatchObject({ done: 3, total: 3, matched: 6, truncated: true });
+
+    // The bound is applied before the volumetric per-pull-request work starts: three
+    // details, not six with three thrown away.
+    expect(seen.filter((progress) => progress.step === 'details')).toHaveLength(3);
+    expect(seen.indexOf(listing as AnalysisProgress)).toBeLessThan(
+      seen.findIndex((progress) => progress.step === 'details'),
+    );
   });
 });
