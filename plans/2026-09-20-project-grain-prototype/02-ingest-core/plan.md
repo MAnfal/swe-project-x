@@ -157,25 +157,25 @@ whose files sit outside any package.
 
 ### Tasks
 
-- [ ] T001 — write failing spec for topology discovery — asserts nodes from workspace
+- [x] T001 — write failing spec for topology discovery — asserts nodes from workspace
       directories and an edge from a declared workspace dependency; fails because no
       topology module exists
-- [ ] T002 — write failing spec for attribution — asserts direct, indirect-with-path, and
+- [x] T002 — write failing spec for attribution — asserts direct, indirect-with-path, and
       the direct-wins-over-indirect rule; fails because no attribution module exists
-- [ ] T003 — write failing spec for boundary validation — asserts a `__proto__` package
+- [x] T003 — write failing spec for boundary validation — asserts a `__proto__` package
       name is rejected and a duplicate name is rejected; fails because no validation exists
-- [ ] T004 — write failing spec for determinism — asserts two ingests over the same fixture
+- [x] T004 — write failing spec for determinism — asserts two ingests over the same fixture
       serialize identically; fails because no ingest module exists
 - [ ] T005 [P] — create the snapshot schema module — Zod schema plus derived types
 - [ ] T006 [P] — create the GitHub client module — authenticated Octokit, pagination, and
       the recursive tree request
-- [ ] T007 — create the topology module — `discoverTopology`
-- [ ] T008 — create the attribution module — file→package mapping, dependency closure,
+- [x] T007 — create the topology module — `discoverTopology`
+- [x] T008 — create the attribution module — file→package mapping, dependency closure,
       direct and indirect sets
-- [ ] T009 — create the ingest entry point — window and bound arguments, returns a
+- [x] T009 — create the ingest entry point — window and bound arguments, returns a
       schema-valid snapshot
-- [ ] T010 — capture real API responses into a committed fixture and wire the specs to them
-- [ ] T011 — create the ingest CLI script
+- [x] T010 — capture real API responses into a committed fixture and wire the specs to them
+- [x] T011 — create the ingest CLI script
 - [ ] T012 — create `completion-report.md` in this chunk directory
 
 Judgment calls to explain in the completion report:
