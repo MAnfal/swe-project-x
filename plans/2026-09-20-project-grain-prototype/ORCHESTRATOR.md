@@ -87,6 +87,8 @@ When every chunk is `Merged`, run `/plan:complete`.
 | 2026-09-20 | `gates_passed` | 03 | Lead re-ran all four in the worktree, type check last: `pnpm lint` 0, `pnpm test` `Tests 135 passed (135)` / 9 files, `pnpm build` 0, `pnpm typecheck` 0. Enrichment coverage derived from the files rather than the report: 100/100, 36/36, 100/100, zero missing `label`/`approach`/`steps` |
 | 2026-09-20 | `review_iteration` | 04 | Iteration 1 **FAIL**, narrow — no architectural defect. Reviewer mutation-tested `derive.ts`/`layout.ts` (7 mutants) and found two survivors: `historyBounds`'s widening loop and `volumeSeries`'s final-bucket clamp both delete with 135/135 still green, because the fixture has no PR outside the window or on a bucket boundary. Lead reproduced both independently. Also: an undisclosed design deviation on page 10 (Home/End and whole-range resize), verified against the `@base-ui/react` primitive source, and a missing statement that designs preceded implementation |
 
+| 2026-09-20 | `review_iteration` | 03 | Iteration 1 **FAIL**, one blocking item — no behavioural defect. Reviewer mutated `resolveSteps`' prefix-uniqueness check (`=== 1` → `>= 1`, silently accepting an ambiguous SHA prefix) and all 135 tests stayed green; the collision case is untested though the code handles it. Lead reproduced it, plus the non-blocking case-insensitivity survivor. Reviewer independently confirmed both plan gate defects the chunk reported |
+
 Events: `wave_started`, `chunk_dispatched`, `gates_passed`, `review_iteration`,
 `review_passed`, `pr_created`, `pr_merged`, `chunk_blocked`, `chunk_dismissed`,
 `wave_merged`, `plan_delivered`.

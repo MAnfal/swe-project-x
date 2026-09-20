@@ -484,6 +484,79 @@ is explicitly required to handle, now exercised by real committed data rather th
 spec.
 
 
+### Wave 3 — chunks 03 and 04
+
+#### Pattern — three chunks, three reviews, the same failure mode
+
+Every chunk in this plan that contained non-trivial logic has failed its first review for
+**tests that cannot fail**, and for nothing else:
+
+| Chunk | Iteration 1 verdict | What survived |
+| ----- | ------------------- | ------------- |
+| 02 | FAIL | Three tests that passed against any implementation |
+| 03 | FAIL | `resolveSteps`' prefix-uniqueness check: `=== 1` → `>= 1`, 135/135 green |
+| 04 | FAIL | `historyBounds`' widening loop deleted, and `volumeSeries`' final-bucket clamp removed — 135/135 green for each |
+
+No iteration-1 review has ever found a behavioural defect in this plan. The code has been
+correct every time. What the review loop has caught, three times out of three, is **evidence
+that does not exist** — and in each case a mutation the lead then reproduced independently in
+under a minute.
+
+Two things this says, and they point in different directions.
+
+**The loop is working.** These are not nitpicks. Chunk 04's `volumeSeries` clamp is the
+difference between a merge exactly at `to` landing in the last bucket and writing off the end
+of the array; chunk 03's uniqueness check is the difference between a mistyped SHA degrading
+and silently attaching a step to the wrong commit. Both would have shipped invisible, and both
+would have surfaced later as data that looks almost right.
+
+**But "tests first, seen failing" is not catching it, and that is the interesting part.** Every
+one of these chunks *did* write tests first and *did* observe them red. The red run proves the
+test fails when the module does not exist. It proves nothing about whether the test fails when
+the module is *wrong*. A test written against a fixture that lacks the edge case is red before
+implementation and green after, exactly like a good test, and stays green forever after the
+guarantee is deleted.
+
+The common shape is sharper than "write better tests": in all four surviving mutants, the
+unpinned logic was a **guard for an input the committed fixture does not contain** — a PR
+outside the declared window, a merge exactly on a bucket boundary, two commits sharing a
+prefix, an uppercase SHA. Principle 4 pushes hard toward testing against real captured output,
+which is right, and the cost is that a real fixture only contains the cases that repository
+happened to produce. The guard for the case it *didn't* produce has nothing to hold it.
+
+**Proposed framework fix** (recorded for Part 2, not applied mid-plan): the chunk-plan template's
+Test Plan section should require, per guard or boundary in the implementation, a named test
+whose input is **constructed** rather than drawn from the fixture — and `generate-chunk-rubric`
+should emit a standing rubric item: *"For each defensive branch, a test exists whose input
+cannot come from the committed fixture."* The evidence is three chunks out of three, which is
+enough to stop treating it as a per-chunk implementer failure and start treating it as a hole in
+what we ask for.
+
+#### Lead error — a measurement I reported with a caveat that could not carry its weight
+
+I gave chunk 03's dispatch brief a table of merged-PR density: xyflow 67, shadcn-ui 13, trpc 36
+at 90 days. The real numbers are **118, 212 and 36**. shadcn-ui was off by 16×.
+
+The method was the bug. I listed *closed* pull requests sorted by `updated`, capped at 6 pages,
+and counted the merged ones. In a repository with a large backlog of closed-but-unmerged pull
+requests that keep receiving comments, the most-recently-*updated* closed PRs are dominated by
+old unmerged ones, so the sample contained almost no recent merges. `trpc/trpc` came out exact
+only because its backlog is small — which is worse than being uniformly wrong, because one
+correct row makes the table look calibrated. The right query is the search API with
+`is:pr is:merged merged:A..B`, which returns an exact `total_count`.
+
+I did label it "lower bounds, not exact counts". That was true and it was not enough. A caveat
+is doing too much work when the gap between the number and reality is 16×: an implementer could
+reasonably have read "13" and dropped `shadcn-ui/ui` from the curated set as too quiet to be
+worth scrubbing. The chunk was not misled only because it re-measured at bake time, which is the
+behaviour the brief asked for — but the brief should not have needed rescuing.
+
+**The generalization**: when the lead hands an implementer a number, the caveat has to be
+proportionate to how wrong the number can be. "Lower bound" is fine for a 10% sampling error and
+useless for a 16× one. If the method can be off by an order of magnitude, either measure
+properly or hand over the *query* rather than the result and let the implementer run it.
+
+
 ---
 
 ## Cold-start brief
