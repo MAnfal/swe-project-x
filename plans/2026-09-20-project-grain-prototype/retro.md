@@ -776,6 +776,74 @@ occurrences makes it a pattern, not an accident.
   `enrichment` means un-enriched fixture; present means it must be complete. Chunk 05 must
   not assume every catalog entry has enrichment — Level 2 renders one that does not.
 
+### Wave 4 → US1 checkpoint boundary
+
+Wave 4 closed with #6 merged at `af3cc5f`. Merged tree re-verified by the lead with the
+worktree removed, type check last: `pnpm lint` 0, `pnpm test`
+`Test Files 13 passed (13) / Tests 246 passed (246)`, `pnpm build` 0, `pnpm typecheck` 0.
+
+#### US1 checkpoint holds — demoed end to end, and the negative clause was measured
+
+The checkpoint reads *"pick a pre-analyzed repository, scrub to any window, see which
+packages changed, expand one to its changes with labels and approach notes, expand a change
+to its ordered steps. No token, no network, no model call."* Driven by the lead in a browser
+against `pnpm start`, not delegated: landing page → `shadcn-ui/ui` → Level 1 → the 30d
+preset → focus `v4` → Level 2 → Level 3 for #11582. Every clause rendered.
+
+The part worth recording is the **negative** clause, because "no network, no model call" is
+the kind of claim a screenshot cannot make. Three independent checks, not one:
+`read_network_requests` captured **zero** requests across all three level transitions;
+`find src/app -name route.ts` returns nothing, so there is no endpoint to call; and
+`grep -rn -e 'process\.env' -e 'fetch(' --include='*.ts' --include='*.tsx' src/` outside
+specs hits exactly one line — a *comment* in `github.ts` stating the token is a parameter.
+`pnpm build` independently corroborates it: `/` and `/_not-found` are both `○ (Static)`.
+
+**Method note for the next checkpoint.** The first grep was run without `--include`, and the
+committed snapshot JSON — which contains other projects' changelogs — buried the answer
+under a screenful of `process.env` matches from *inside a fixture*. A corpus-wide grep in
+this repository is unreadable unless it is scoped to code extensions, because roughly half
+the tracked bytes are captured API output. Scope first, then read.
+
+#### Framework friction — the boundary check found a gap that no chunk was ever going to report
+
+`execute.md` § Step 6.3b tells the lead to re-verify `project.md` against the merged tree,
+framed as *"the check that each chunk did its part"*. Applying chunk 05's two declared
+deltas took that framing literally. But re-running the Commands table turned up a third
+gap that belongs to **no chunk**: `pnpm start` has existed in `package.json` since chunk 01
+and has been used at three consecutive wave boundaries to demo a story — and was never in
+the table. No chunk under-reported it; it is a command the *lead* uses, and the deltas
+protocol only ever asks implementers what they changed.
+
+Also worth recording: chunk 05's report said `derive.ts` needs **two** of
+`enrichment-record.ts`'s exports. It imports **three** (`enrichmentKey`,
+`fallbackEnrichment`, `isFallbackEnrichment`). Harmless here, and the delta went in
+corrected — but it is the third wave running in which a reported `project.md` delta was
+inaccurate in a detail that only reading the source catches. The rule that saved it is
+`evidence.md`'s, not the protocol's: measure the claim before you write it down.
+
+**Proposed** (for Part 2, evidence above): the boundary step should say the lead re-derives
+the Commands table from `package.json` rather than re-running what the table already lists.
+The existing wording only finds commands that *changed*; it structurally cannot find one
+that was never written down.
+
+#### Carry-forward claims re-derived at this boundary
+
+- **Convention Map globs still match the tree.** Re-counted with `git ls-files`:
+  `src/lib/**/*.ts` 24, `src/components/**/*.tsx` 20, `src/**/*.test.ts` 13,
+  `src/components/ui/**` 7, `scripts/**` 2, `src/**/*.generated.ts` 1.
+- **Two rows match zero files, both correctly.** `src/app/**/route.ts` — chunk 06 has not
+  built a route yet, and it is the row that governs the one it will build. `src/**/*.test.tsx`
+  — no component spec exists; the `src/components/**/*.tsx` row does not require one (only
+  the `src/lib/**/*.ts` row demands a co-located spec), so this is a row waiting for its
+  first file, not a violation.
+- **A `git ls-files` count of `src/app/**/page.tsx` is 0 and this is a tooling artifact, not
+  a missing file.** Git's `**/` requires an intervening directory, so the glob misses
+  `src/app/page.tsx` at the root. Anyone re-running this check should confirm with a plain
+  `git ls-files src/app` before concluding a convention row is dead.
+- **Stack versions unchanged**; chunk 05 added no dependency, no command, no new file kind.
+
+---
+
 ---
 
 ## Cold-start brief

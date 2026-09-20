@@ -81,6 +81,7 @@ All commands run from the repository root.
 | Unit tests | `pnpm test` |
 | Build | `pnpm build` |
 | Run the app | `pnpm dev` — serves http://localhost:3000 |
+| Run the production build | `pnpm start` — serves the `pnpm build` output at http://localhost:3000. Use this, not `pnpm dev`, for a story checkpoint: it exercises the static prerender and the client chunks that actually ship. Verified 2026-09-20 at the wave-4 boundary (`✓ Ready in 117ms`, HTTP 200) |
 | Ingest a repository | `node scripts/ingest.mts --repo <owner/repo> --since <iso> --until <iso> --out <file>` — also `--branch`, `--max-pull-requests`, `--record <transcript>`, `--record-sample <n>`, `--replay <transcript>`, `--enrich`, `--model <id>`, `--concurrency <n>`, `--reuse <snapshot.json>`. Needs `GITHUB_TOKEN` unless `--replay`; `--enrich` additionally needs `ANTHROPIC_API_KEY` |
 | Bake a curated snapshot | `node scripts/ingest.mts --repo <owner/repo> --since <iso> --until <iso> --out src/lib/snapshots/<owner>-<repo>-<since-date>.json --enrich` — **spends money**, one model call per pull request. Add `--reuse <the same file>` to retry only failures after a code change |
 | Regenerate the snapshot index | `node scripts/build-snapshot-index.mts` — reads `src/lib/snapshots/` and rewrites `src/lib/view/catalog.generated.ts`. Runs automatically as `prebuild`, so `pnpm build` regenerates it |
@@ -344,6 +345,15 @@ a follow-up.
   default.Graph is not a constructor`. Use the named exports:
   `import { Graph, layout } from '@dagrejs/dagre'`. Note also that dagre reports a node's
   **centre** while React Flow positions by the **top-left** corner.
+- **`setState` inside `useEffect` is a lint *error*, not a warning.** `eslint-config-next`
+  16.3.5 enables `react-hooks/set-state-in-effect` at error level, so a "read
+  `localStorage` after mount and set state" component fails `pnpm lint` outright. Measured
+  2026-09-20 by chunk 05 (two errors in `src/components/canvas/onboarding-tour.tsx`) and
+  re-measured by the lead at the wave-4 boundary with a throwaway canary component —
+  `✖ 1 problem (1 error, 0 warnings)`, `Avoid calling setState() directly within an
+  effect`. For browser-only state on a statically prerendered route use
+  `useSyncExternalStore` with a server snapshot; for state derived from props, compute it
+  during render.
 
 ## Layout
 
@@ -365,6 +375,13 @@ src/
                 credential: the token arrives as a parameter. Co-located *.test.ts.
     ai/         The enrichment module and its specs — one model call per pull request.
                 Reads no credential: a configured model arrives as a parameter.
+                enrichment-record.ts holds the parts of the enrichment contract that
+                involve no model — enrichmentKey, FALLBACK_APPROACH,
+                isFallbackEnrichment, fallbackEnrichment — and imports no `ai`.
+                enrichment.ts re-exports all of them. The split exists because
+                src/lib/view/derive.ts needs three of them and is imported by client
+                components, and an `ai` import on a component path violates
+                Principle 2.
     ingest/     GitHub ingest, topology discovery, and the recorded HTTP transcripts
                 under fixtures/.
     view/       View derivation and the snapshot catalog. catalog.generated.ts is
