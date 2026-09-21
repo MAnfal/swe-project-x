@@ -90,6 +90,12 @@
     color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
     padding: 1px 5px; white-space: nowrap;
   }
+  /* a card whose body is one link and whose extra tag is another */
+  .card-split { position: relative; }
+  .card-split .card-link { text-decoration: none; }
+  .card-split .card-link::after { content: ""; position: absolute; inset: 0; border-radius: 10px; }
+  a.tag { position: relative; text-decoration: none; }
+  a.tag:hover { color: var(--fg); border-color: var(--muted); }
 
   /* ---- inline figure ---- */
   figure.shot { margin: 0; }
@@ -168,15 +174,10 @@
   <section>
     <h2>Design</h2>
     <p class="section-note">
-      In the order it happened — a vague pain point scoped into a spec, the three levels sketched,
-      then a clickable design to build the canvas against. All of it before any code existed.
+      In the order it happened — the three levels sketched by hand, then made clickable as the
+      design the canvas was built against. Both before any code existed.
     </p>
     <div class="cards">
-
-      <a class="card" href="/submission/prototype-brainstorm.pdf" target="_blank" rel="noopener">
-        <span class="card-title">Prototype brainstorm <span class="tag">PDF</span></span>
-        <span class="card-desc">The session that turned a vague pain point into a scoped spec — problem framing, what got cut, and why.</span>
-      </a>
 
       <figure class="shot">
         <a href="/submission/lofi-three-levels.png" target="_blank" rel="noopener">
@@ -192,10 +193,14 @@
         </figcaption>
       </figure>
 
-      <a class="card" href="https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1" target="_blank" rel="noopener">
-        <span class="card-title">Mid-fi design <span class="tag">Artifact</span></span>
-        <span class="card-desc">The sketch made interactive — the mid-fidelity design the canvas was built against.</span>
-      </a>
+      <div class="card card-split">
+        <span class="card-title">
+          <a class="card-link" href="https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1" target="_blank" rel="noopener">Mid-fi design</a>
+          <span class="tag">Artifact</span>
+          <a class="tag" href="/submission/mid-fi.pdf" target="_blank" rel="noopener">PDF</a>
+        </span>
+        <span class="card-desc">The sketch made interactive — the mid-fidelity design the canvas was built against. The PDF is the same eleven pages, exported.</span>
+      </div>
 
     </div>
   </section>

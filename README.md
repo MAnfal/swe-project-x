@@ -21,8 +21,7 @@ do not render on GitHub, so read them there rather than here.
 | **Design rationale** | [Google Doc](https://docs.google.com/document/d/1B6-XtsuPth4XSiOevKFVXq4RyE39KCGvYjSAGURytJ4/edit?usp=sharing) — why this theme, what makes it non-obvious, the tradeoffs, and what's next |
 | **Spec-driven development** | [The method this was built with](https://anfalmushtaq.com/articles/primitives-of-spec-driven-development) |
 | **Lo-fi sketch** | [Drawing](https://swe-project-x.vercel.app/submission/lofi-three-levels.png) — the three levels, before anything else |
-| **Mid-fi design** | [Claude artifact](https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1) — the sketch made interactive, what the canvas was built against |
-| **Prototype brainstorm** | [PDF](https://swe-project-x.vercel.app/submission/prototype-brainstorm.pdf) — the session that scoped the spec |
+| **Mid-fi design** | [Claude artifact](https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1) — the sketch made interactive, what the canvas was built against ([PDF](https://swe-project-x.vercel.app/submission/mid-fi.pdf)) |
 | **Build transcripts** | [Eight Claude Code sessions](https://swe-project-x.vercel.app/submission#execution), 08:01–19:44 on 2026-09-20 |
 
 The spec, the six chunk plans, every review iteration and the retro are checked in under
