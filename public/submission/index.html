@@ -97,16 +97,18 @@
   a.tag { position: relative; text-decoration: none; }
   a.tag:hover { color: var(--fg); border-color: var(--muted); }
 
-  /* ---- inline figure ---- */
-  figure.shot { margin: 0; }
-  figure.shot a {
-    display: block; border: 1px solid var(--border); border-radius: 10px;
-    overflow: hidden; background: #101010; box-shadow: var(--shadow);
-    transition: border-color .15s ease;
+  /* ---- inline figure: a card that carries its label above the image ---- */
+  figure.shot {
+    position: relative; margin: 0; overflow: hidden;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--card); box-shadow: var(--shadow);
+    transition: background .15s ease, border-color .15s ease;
   }
-  figure.shot a:hover { border-color: var(--muted); }
+  figure.shot:hover { background: var(--card-hover); border-color: var(--muted); }
+  figure.shot a { display: block; background: #101010; border-top: 1px solid var(--border); }
+  figure.shot a::after { content: ""; position: absolute; inset: 0; }
   figure.shot img { display: block; width: 100%; height: auto; }
-  figcaption { font-size: .875rem; color: var(--muted); margin-top: 9px; padding: 0 2px; }
+  figcaption { font-size: .875rem; color: var(--muted); padding: 16px 18px; }
   .cap-title { font-weight: 600; font-size: .9375rem; color: var(--fg); display: flex; align-items: baseline; gap: 8px; }
   .cap-desc { display: block; margin-top: 3px; }
 
@@ -128,7 +130,6 @@
   .step-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
   .step-title { font-weight: 600; font-size: .9375rem; text-decoration: none; }
   .step-title:hover { text-decoration: underline; }
-  .step-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .step-desc { color: var(--muted); font-size: .875rem; margin: 4px 0 0; }
   .step-link { font-size: .8125rem; display: inline-block; margin-top: 7px; }
 
@@ -180,9 +181,6 @@
     <div class="cards">
 
       <figure class="shot">
-        <a href="/submission/lofi-three-levels.png" target="_blank" rel="noopener">
-          <img src="/submission/lofi-three-levels.png" alt="Hand-drawn sketch of the three levels: packages and their dependency arrows at level one, the changes that reached a package at level two, and the ordered steps behind one change at level three." loading="lazy" width="3635" height="1488">
-        </a>
         <figcaption>
           <span class="cap-title">Lo-fi sketch <span class="tag">Drawing</span></span>
           <span class="cap-desc">
@@ -191,6 +189,9 @@
             the shipped prototype still has.
           </span>
         </figcaption>
+        <a href="/submission/lofi-three-levels.png" target="_blank" rel="noopener">
+          <img src="/submission/lofi-three-levels.png" alt="Hand-drawn sketch of the three levels: packages and their dependency arrows at level one, the changes that reached a package at level two, and the ordered steps behind one change at level three." loading="lazy" width="3635" height="1488">
+        </a>
       </figure>
 
       <div class="card card-split">
@@ -208,9 +209,9 @@
   <section>
     <h2 id="execution">Execution</h2>
     <p class="section-note">
-      Eight Claude Code sessions, all on 20 September 2026, from 08:01 to 19:44. Every one is
-      a complete transcript — the prompts, the model&rsquo;s reasoning, the tool calls, and the
-      reviews that sent work back.
+      Eight Claude Code sessions, in the order they ran. Every one is a complete transcript
+      — the prompts, the model&rsquo;s reasoning, the tool calls, and the reviews that sent work
+      back.
       They run on the loop I describe in
       <a href="https://anfalmushtaq.com/articles/primitives-of-spec-driven-development" target="_blank" rel="noopener">Primitives of spec-driven development</a>.
     </p>
@@ -221,7 +222,6 @@
         <span class="step-num">1</span>
         <div class="step-head">
           <a class="step-title" href="/submission/transcripts/step1-prototype-v1-brainstorm/index.html">Brainstorm &amp; spec</a>
-          <span class="step-time">08:01 – 09:27</span>
         </div>
         <p class="step-desc">
           Where the idea got pinned down. The problem is that a codeowner loses the shape of
@@ -236,7 +236,6 @@
         <span class="step-num">2</span>
         <div class="step-head">
           <a class="step-title" href="/submission/transcripts/step2-boilerplate-creation/index.html">Boilerplate</a>
-          <span class="step-time">09:15 – 09:39</span>
         </div>
         <p class="step-desc">
           Next.js, Tailwind, shadcn/ui and Vitest, plus the verification gates every later
@@ -250,10 +249,9 @@
         <span class="step-num">3</span>
         <div class="step-head">
           <a class="step-title" href="/submission/transcripts/step3-ingest-core/index.html">Ingest core</a>
-          <span class="step-time">09:39 – 15:30</span>
         </div>
         <p class="step-desc">
-          The deterministic half, and the longest session of the day: the snapshot schema, the
+          The deterministic half, and the longest of the eight: the snapshot schema, the
           GitHub client, monorepo topology discovery, and attributing each pull request to the
           packages it touched — directly or through a dependency. No model involved anywhere in
           it, which is what makes the layer above it testable.
@@ -265,7 +263,6 @@
         <span class="step-num">4</span>
         <div class="step-head">
           <a class="step-title" href="/submission/transcripts/step4-ai-enrichment-and-canvas-topology/index.html">Enrichment &amp; canvas topology</a>
-          <span class="step-time">15:37 – 17:03</span>
         </div>
         <p class="step-desc">
           Two chunks running in parallel off the same base. One taught the model to name what a
@@ -279,7 +276,6 @@
         <span class="step-num">5</span>
         <div class="step-head">
           <a class="step-title" href="/submission/transcripts/step5-canvas-levels/index.html">Canvas levels</a>
-          <span class="step-time">17:06 – 18:00</span>
         </div>
         <p class="step-desc">
           Levels two and three: the changes that reached one package, and the ordered chain of
@@ -293,7 +289,6 @@
         <span class="step-num">6</span>
         <div class="step-head">
           <a class="step-title" href="/submission/transcripts/step6-live-ingest/index.html">Live analysis</a>
-          <span class="step-time">18:06 – 19:09</span>
         </div>
         <p class="step-desc">
           Paste any public GitHub repository and have it analyzed on demand, streaming progress
@@ -307,7 +302,6 @@
         <span class="step-num">7</span>
         <div class="step-head">
           <a class="step-title" href="/submission/transcripts/step7-final-pr-to-main/index.html">Final PR to main</a>
-          <span class="step-time">19:10 – 19:29</span>
         </div>
         <p class="step-desc">
           Six merged chunks assembled into one pull request against main, with the deployed
@@ -320,7 +314,6 @@
         <span class="step-num">8</span>
         <div class="step-head">
           <a class="step-title" href="/submission/transcripts/step8-plan-complete/index.html">Retro &amp; close-out</a>
-          <span class="step-time">19:34 – 19:44</span>
         </div>
         <p class="step-desc">
           The retro: what the loop got right, what it cost, and the framework changes that came
