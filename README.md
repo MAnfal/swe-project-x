@@ -22,7 +22,7 @@ do not render on GitHub, so read them there rather than here.
 | **Spec-driven development** | [The method this was built with](https://anfalmushtaq.com/articles/primitives-of-spec-driven-development) |
 | **Lo-fi sketch** | [Drawing](https://swe-project-x.vercel.app/submission/lofi-three-levels.png) — the three levels, before anything else |
 | **Mid-fi design** | [Claude artifact](https://claude.ai/artifact/P1zvfQgt23ZYJUezR9u7i1) — the sketch made interactive, what the canvas was built against ([PDF](https://swe-project-x.vercel.app/submission/mid-fi.pdf)) |
-| **Build transcripts** | [Eight Claude Code sessions](https://swe-project-x.vercel.app/submission#execution), 08:01–19:44 on 2026-09-20 |
+| **Build transcripts** | [Eight Claude Code sessions](https://swe-project-x.vercel.app/submission#execution), in the order they ran |
 
 The spec, the six chunk plans, every review iteration and the retro are checked in under
 [`plans/completed/2026-09-20-project-grain-prototype/`](plans/completed/2026-09-20-project-grain-prototype/).
